@@ -1,10 +1,13 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type {
   AppSettings,
+  Asset,
   MonthFile,
   ProjectDetail,
+  SecurityStatus,
+  StatsReport,
   VaultInfo,
   WeeklyPreview
 } from '@shared/api'
@@ -45,8 +48,17 @@ import {
   projectFilePath,
   readProject
 } from './projects'
+import { listAssets, removeAsset, saveAsset } from './assets'
 import { closeCapture } from './capture'
-import { searchVault } from './search'
+import { listTags, searchVault } from './search'
+import {
+  isConfigured,
+  isUnlocked,
+  lockSession,
+  setupPassword,
+  unlockSession
+} from './security'
+import { computeStats, monthsBetween } from './stats'
 import {
   initializeVault,
   monthFilePath,
@@ -77,6 +89,8 @@ const WEEK_RE = /^\d{4}-W\d{2}$/
 function assertWeek(week: string): void {
   if (!WEEK_RE.test(week)) throw new Error(`非法的周次：${week}`)
 }
+
+let clipboardClearTimer: NodeJS.Timeout | null = null
 
 async function requireVault(): Promise<string> {
   const config = await readAppConfig()
@@ -418,7 +432,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('settings:get', async (): Promise<AppSettings> => {
     const config = await readAppConfig()
-    return { theme: config.theme }
+    return { theme: config.theme, secretClearSeconds: config.secretClearSeconds }
   })
 
   ipcMain.handle(
@@ -426,7 +440,18 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     async (_event, theme: 'light' | 'dark'): Promise<AppSettings> => {
       if (theme !== 'light' && theme !== 'dark') throw new Error(`非法的主题：${theme}`)
       const config = await updateAppConfig({ theme })
-      return { theme: config.theme }
+      return { theme: config.theme, secretClearSeconds: config.secretClearSeconds }
+    }
+  )
+
+  ipcMain.handle(
+    'settings:set-secret-clear-seconds',
+    async (_event, seconds: number): Promise<AppSettings> => {
+      if (!Number.isFinite(seconds) || seconds < 1 || seconds > 300) {
+        throw new Error('自动清除时间需在 1 到 300 秒之间')
+      }
+      const config = await updateAppConfig({ secretClearSeconds: Math.round(seconds) })
+      return { theme: config.theme, secretClearSeconds: config.secretClearSeconds }
     }
   )
 
@@ -458,4 +483,86 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('capture:close', async (): Promise<void> => {
     closeCapture()
   })
+
+  ipcMain.handle('daily:tags', async (): Promise<string[]> => {
+    const vaultPath = await requireVault()
+    return listTags(vaultPath)
+  })
+
+  ipcMain.handle('security:status', async (): Promise<SecurityStatus> => {
+    const vaultPath = await requireVault()
+    return { configured: await isConfigured(vaultPath), unlocked: isUnlocked(vaultPath) }
+  })
+
+  ipcMain.handle('security:setup', async (_event, password: string): Promise<SecurityStatus> => {
+    const vaultPath = await requireVault()
+    await setupPassword(vaultPath, password)
+    return { configured: true, unlocked: true }
+  })
+
+  ipcMain.handle('security:unlock', async (_event, password: string): Promise<SecurityStatus> => {
+    const vaultPath = await requireVault()
+    const ok = await unlockSession(vaultPath, password)
+    if (!ok) throw new Error('主密码不正确')
+    return { configured: true, unlocked: true }
+  })
+
+  ipcMain.handle('security:lock', async (): Promise<SecurityStatus> => {
+    lockSession()
+    const vaultPath = await requireVault()
+    return { configured: await isConfigured(vaultPath), unlocked: false }
+  })
+
+  ipcMain.handle('assets:list', async (_event, project: string): Promise<Asset[]> => {
+    const vaultPath = await requireVault()
+    return listAssets(vaultPath, project)
+  })
+
+  ipcMain.handle(
+    'assets:save',
+    async (_event, project: string, asset: Asset): Promise<Asset[]> => {
+      const vaultPath = await requireVault()
+      return saveAsset(vaultPath, project, asset)
+    }
+  )
+
+  ipcMain.handle(
+    'assets:remove',
+    async (_event, project: string, id: string): Promise<Asset[]> => {
+      const vaultPath = await requireVault()
+      return removeAsset(vaultPath, project, id)
+    }
+  )
+
+  ipcMain.handle('assets:copy', async (_event, text: string): Promise<void> => {
+    await clipboard.writeText(text)
+
+    const config = await readAppConfig()
+    const seconds = Math.max(1, config.secretClearSeconds)
+    if (clipboardClearTimer) clearTimeout(clipboardClearTimer)
+
+    clipboardClearTimer = setTimeout(() => {
+      clipboardClearTimer = null
+      // 只有剪贴板内容仍是这条记录时才清空，避免覆盖用户后来复制的东西
+      void clipboard.readText().then((current) => {
+        if (current === text) clipboard.clear()
+      })
+    }, seconds * 1000)
+  })
+
+  ipcMain.handle(
+    'stats:range',
+    async (_event, start: string, end: string): Promise<StatsReport> => {
+      assertDate(start)
+      assertDate(end)
+      if (start > end) throw new Error('时间范围不合法')
+
+      const vaultPath = await requireVault()
+      const docs = []
+      for (const month of monthsBetween(start, end)) {
+        docs.push(parseMonth(month, await readMonthRaw(vaultPath, month)))
+      }
+      return computeStats(docs, start, end)
+    }
+  )
 }

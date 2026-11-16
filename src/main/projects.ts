@@ -72,7 +72,7 @@ export async function readProject(vaultPath: string, name: string): Promise<Proj
 
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
   const folders = entries
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
     .map((entry) => entry.name)
     .sort()
 

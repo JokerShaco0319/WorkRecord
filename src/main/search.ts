@@ -16,7 +16,7 @@ const KIND_ORDER: Record<SearchHit['kind'], number> = {
   'project-file': 3
 }
 
-async function listMarkdown(root: string): Promise<WalkedFile[]> {
+export async function listMarkdown(root: string): Promise<WalkedFile[]> {
   const files: WalkedFile[] = []
 
   async function walk(dir: string, prefix: string): Promise<void> {
@@ -110,4 +110,27 @@ export async function searchVault(
   })
 
   return hits.slice(0, limit)
+}
+
+/** 统计所有日报条目里出现过的标签，按使用频率排序 */
+export async function listTags(vaultPath: string): Promise<string[]> {
+  const counts = new Map<string, number>()
+
+  for (const file of await listMarkdown(join(vaultPath, 'daily'))) {
+    const month = basename(file.rel, '.md')
+    if (!/^\d{4}-\d{2}$/.test(month)) continue
+
+    const raw = await readFile(file.abs, 'utf-8').catch(() => '')
+    for (const week of parseMonth(month, raw).weeks) {
+      for (const day of week.days) {
+        for (const entry of day.entries) {
+          for (const tag of entry.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+        }
+      }
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([tag]) => tag)
 }

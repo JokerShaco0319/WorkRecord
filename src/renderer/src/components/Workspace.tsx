@@ -7,15 +7,17 @@ import {
   FolderIcon,
   MoonIcon,
   SearchIcon,
-  SunIcon
+  SunIcon,
+  TimerIcon
 } from './icons'
 import DayView from './DayView'
 import ProjectsView from './ProjectsView'
 import SearchOverlay from './SearchOverlay'
+import StatsView from './StatsView'
 import TodoView from './TodoView'
 import WeeklyView from './WeeklyView'
 
-type View = 'day' | 'todo' | 'projects' | 'weekly'
+type View = 'day' | 'todo' | 'projects' | 'weekly' | 'stats'
 
 interface NavItemProps {
   icon: ReactNode
@@ -163,6 +165,13 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
               setView('weekly')
             }}
           />
+          <NavItem
+            icon={<TimerIcon className="h-4 w-4" />}
+            label="统计"
+            active={view === 'stats'}
+            dataAction="nav-stats"
+            onClick={() => setView('stats')}
+          />
         </nav>
 
         <div className="mt-auto border-t border-line/70 px-5 py-4">
@@ -196,6 +205,7 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
         {view === 'weekly' && (
           <WeeklyView key={weekSeed?.nonce ?? 'week'} initialWeek={weekSeed?.week} />
         )}
+        {view === 'stats' && <StatsView />}
       </main>
 
       {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} onOpen={openHit} />}

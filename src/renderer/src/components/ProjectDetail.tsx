@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectDetail as ProjectDetailData, ProjectFileInfo } from '@shared/api'
+import AssetsPanel from './AssetsPanel'
 import { ChevronLeftIcon, FileIcon, FolderIcon, TrashIcon } from './icons'
 
 interface Props {
@@ -24,6 +25,7 @@ function formatModified(iso: string): string {
 export default function ProjectDetail({ name, onBack }: Props) {
   const [detail, setDetail] = useState<ProjectDetailData | null>(null)
   const [category, setCategory] = useState<string | null>(null)
+  const [mode, setMode] = useState<'files' | 'assets'>('files')
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newCategory, setNewCategory] = useState('')
@@ -80,7 +82,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
   async function handleDrop(event: React.DragEvent): Promise<void> {
     event.preventDefault()
     setDragOver(false)
-    if (!category) return
+    if (mode !== 'files' || !category) return
 
     const paths: string[] = []
     for (const file of Array.from(event.dataTransfer.files)) {
@@ -130,14 +132,39 @@ export default function ProjectDetail({ name, onBack }: Props) {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => category && void run(window.api.files.import(name, category))}
-                disabled={!category}
-                className="h-7 rounded-md bg-accent px-2.5 text-[11px] font-medium text-white transition hover:brightness-110 disabled:opacity-50"
-              >
-                导入文件
-              </button>
+              <div className="flex rounded-lg border border-line bg-paper p-0.5">
+                {(
+                  [
+                    ['files', '文件'],
+                    ['assets', '加密资产']
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    data-action={`project-mode-${key}`}
+                    onClick={() => setMode(key)}
+                    className={`rounded-[6px] px-2.5 py-1 text-[11px] transition-colors ${
+                      mode === key
+                        ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0_/_0.06)]'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {mode === 'files' && (
+                <button
+                  type="button"
+                  onClick={() => category && void run(window.api.files.import(name, category))}
+                  disabled={!category}
+                  className="h-7 rounded-md bg-accent px-2.5 text-[11px] font-medium text-white transition hover:brightness-110 disabled:opacity-50"
+                >
+                  导入文件
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void window.api.projects.reveal(name)}
@@ -148,6 +175,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
             </div>
           </div>
 
+          {mode === 'files' && (
           <div className="mt-4 flex flex-wrap items-center gap-1">
             {categories.map((item) => (
               <button
@@ -202,6 +230,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
               </button>
             )}
           </div>
+          )}
 
           {error && (
             <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -224,7 +253,9 @@ export default function ProjectDetail({ name, onBack }: Props) {
         className="relative min-h-0 flex-1 overflow-y-auto px-10 py-5"
       >
         <div className="mx-auto w-full max-w-[980px]">
-          {files.length > 0 ? (
+          {mode === 'assets' ? (
+            <AssetsPanel project={name} />
+          ) : files.length > 0 ? (
             <ul className="space-y-0.5">
               {files.map((file: ProjectFileInfo) => (
                 <li
@@ -289,7 +320,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
           )}
         </div>
 
-        {dragOver && (
+        {dragOver && mode === 'files' && (
           <div className="pointer-events-none absolute inset-3 rounded-xl border-2 border-dashed border-accent/50 bg-accent-soft/40">
             <div className="grid h-full place-items-center text-[13px] font-medium text-accent">
               松手导入到「{category}」

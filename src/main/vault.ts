@@ -8,9 +8,10 @@ export type ThemeMode = 'light' | 'dark'
 export interface AppConfig {
   vaultPath: string | null
   theme: ThemeMode
+  secretClearSeconds: number
 }
 
-const DEFAULT_CONFIG: AppConfig = { vaultPath: null, theme: 'light' }
+const DEFAULT_CONFIG: AppConfig = { vaultPath: null, theme: 'light', secretClearSeconds: 12 }
 const VAULT_FOLDERS = ['daily', 'weekly', 'projects', 'inbox', '.workrecord']
 
 export function appConfigPath(): string {

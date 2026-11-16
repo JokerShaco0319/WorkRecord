@@ -9,6 +9,7 @@
   --color-accent: #2f6b5f;
   --color-accent-soft: #e6efec;
   --color-code-bg: #f0eee9;
+  --color-chart-bar: #0a8a6e;
 
   --font-sans:
     'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
@@ -29,6 +30,7 @@
   --color-accent: #74b3a2;
   --color-accent-soft: #24332e;
   --color-code-bg: #2c2925;
+  --color-chart-bar: #2ea98f;
 }
 
 html,

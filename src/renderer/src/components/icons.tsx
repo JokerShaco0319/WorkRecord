@@ -120,3 +120,12 @@ export function SunIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function TimerIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <circle cx="8" cy="8.5" r="5.2" />
+      <path d="M8 5.8v3l2.1 1.2" />
+    </svg>
+  )
+}

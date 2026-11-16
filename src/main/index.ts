@@ -1,7 +1,9 @@
-import { app, BrowserWindow, globalShortcut, shell } from 'electron'
+import { app, BrowserWindow, Menu, Tray, globalShortcut, nativeImage, shell } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { formatDateKey } from '@shared/date'
+import windowIcon from '../../resources/icon.png?asset'
+import trayIcon from '../../resources/tray.png?asset'
 import { backupVault } from './backup'
 import { openCapture } from './capture'
 import { registerIpc } from './ipc'
@@ -14,6 +16,39 @@ if (process.env.WORKRECORD_USER_DATA) {
 }
 
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let isQuitting = false
+
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+    return
+  }
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function createTray(): void {
+  if (tray) return
+
+  tray = new Tray(nativeImage.createFromPath(trayIcon))
+  tray.setToolTip('WorkRecord')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '打开 WorkRecord', click: showMainWindow },
+      { label: '快速记录', click: () => openCapture() },
+      { type: 'separator' },
+      {
+        label: '退出',
+        click: () => {
+          isQuitting = true
+          app.quit()
+        }
+      }
+    ])
+  )
+  tray.on('click', showMainWindow)
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -23,6 +58,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     title: 'WorkRecord',
+    icon: windowIcon,
     backgroundColor: '#f7f6f3',
     autoHideMenuBar: true,
     webPreferences: {
@@ -38,6 +74,12 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }
+  })
+
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return
+    event.preventDefault()
+    mainWindow?.hide()
   })
 
   const devUrl = process.env.ELECTRON_RENDERER_URL
@@ -82,6 +124,42 @@ function createWindow(): void {
         await new Promise((resolve) => setTimeout(resolve, 1000))
       }
 
+      const fillPayload = process.env.WORKRECORD_CAPTURE_FILL
+      if (fillPayload) {
+        const steps = JSON.parse(fillPayload) as Array<{
+          click?: string
+          selector?: string
+          index?: number
+          value?: string
+          enter?: boolean
+        }>
+
+        for (const step of steps) {
+          if (step.click) {
+            await mainWindow?.webContents.executeJavaScript(
+              `document.querySelector(${JSON.stringify(step.click)})?.click()`
+            )
+          } else if (step.value !== undefined) {
+            const selector = step.selector ?? 'input'
+            const index = step.index ?? 0
+            const pressEnter = step.enter
+              ? "el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))"
+              : ''
+
+            await mainWindow?.webContents.executeJavaScript(`(() => {
+              const el = document.querySelectorAll(${JSON.stringify(selector)})[${index}]
+              if (!el) return
+              const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+              setter.call(el, ${JSON.stringify(step.value)})
+              el.dispatchEvent(new Event('input', { bubbles: true }))
+              ${pressEnter}
+            })()`)
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 600))
+        }
+      }
+
       const image = await mainWindow?.webContents.capturePage()
       if (image) await writeFile(capturePath, image.toPNG())
       app.quit()
@@ -92,6 +170,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   registerIpc(() => mainWindow)
   createWindow()
+  createTray()
 
   globalShortcut.register('CommandOrControl+Shift+Space', () => openCapture())
 
@@ -108,10 +187,14 @@ app.whenReady().then(() => {
   })
 })
 
+app.on('before-quit', () => {
+  isQuitting = true
+})
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // 常驻托盘：关掉窗口不退出，从托盘菜单或快捷键继续使用
 })

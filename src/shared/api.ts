@@ -47,6 +47,48 @@ export type SearchHit =
 
 export interface AppSettings {
   theme: 'light' | 'dark'
+  secretClearSeconds: number
+}
+
+export interface AssetField {
+  id: string
+  label: string
+  value: string
+  secret: boolean
+}
+
+export interface Asset {
+  id: string
+  title: string
+  fields: AssetField[]
+  notes: string
+  updatedAt: string
+}
+
+export interface SecurityStatus {
+  configured: boolean
+  unlocked: boolean
+}
+
+export interface ProjectStat {
+  project: string
+  minutes: number
+  count: number
+}
+
+export interface DayStat {
+  date: string
+  minutes: number
+}
+
+export interface StatsReport {
+  start: string
+  end: string
+  totalMinutes: number
+  entryCount: number
+  untimedCount: number
+  projects: ProjectStat[]
+  days: DayStat[]
 }
 
 export interface WorkRecordApi {
@@ -61,6 +103,7 @@ export interface WorkRecordApi {
     removeEntry(date: string, target: EntryTarget): Promise<DayDoc>
     readMonth(month: string): Promise<MonthFile>
     saveMonth(month: string, raw: string): Promise<MonthFile>
+    tags(): Promise<string[]>
   }
   todo: {
     read(): Promise<TodoDoc>
@@ -97,6 +140,7 @@ export interface WorkRecordApi {
   settings: {
     get(): Promise<AppSettings>
     setTheme(theme: 'light' | 'dark'): Promise<AppSettings>
+    setSecretClearSeconds(seconds: number): Promise<AppSettings>
   }
   capture: {
     submit(text: string): Promise<void>
@@ -104,5 +148,20 @@ export interface WorkRecordApi {
   }
   events: {
     onDataChanged(listener: () => void): () => void
+  }
+  security: {
+    status(): Promise<SecurityStatus>
+    setup(password: string): Promise<SecurityStatus>
+    unlock(password: string): Promise<SecurityStatus>
+    lock(): Promise<SecurityStatus>
+  }
+  assets: {
+    list(project: string): Promise<Asset[]>
+    save(project: string, asset: Asset): Promise<Asset[]>
+    remove(project: string, id: string): Promise<Asset[]>
+    copy(text: string): Promise<void>
+  }
+  stats: {
+    range(start: string, end: string): Promise<StatsReport>
   }
 }

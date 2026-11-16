@@ -13,7 +13,8 @@ const api: WorkRecordApi = {
       ipcRenderer.invoke('daily:update-entry', date, target, entry),
     removeEntry: (date, target) => ipcRenderer.invoke('daily:remove-entry', date, target),
     readMonth: (month) => ipcRenderer.invoke('daily:read-month', month),
-    saveMonth: (month, raw) => ipcRenderer.invoke('daily:save-month', month, raw)
+    saveMonth: (month, raw) => ipcRenderer.invoke('daily:save-month', month, raw),
+    tags: () => ipcRenderer.invoke('daily:tags')
   },
   todo: {
     read: () => ipcRenderer.invoke('todo:read'),
@@ -51,7 +52,9 @@ const api: WorkRecordApi = {
   },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
-    setTheme: (theme) => ipcRenderer.invoke('settings:set-theme', theme)
+    setTheme: (theme) => ipcRenderer.invoke('settings:set-theme', theme),
+    setSecretClearSeconds: (seconds) =>
+      ipcRenderer.invoke('settings:set-secret-clear-seconds', seconds)
   },
   capture: {
     submit: (text) => ipcRenderer.invoke('capture:submit', text),
@@ -65,6 +68,21 @@ const api: WorkRecordApi = {
         ipcRenderer.removeListener('data:changed', handler)
       }
     }
+  },
+  security: {
+    status: () => ipcRenderer.invoke('security:status'),
+    setup: (password) => ipcRenderer.invoke('security:setup', password),
+    unlock: (password) => ipcRenderer.invoke('security:unlock', password),
+    lock: () => ipcRenderer.invoke('security:lock')
+  },
+  assets: {
+    list: (project) => ipcRenderer.invoke('assets:list', project),
+    save: (project, asset) => ipcRenderer.invoke('assets:save', project, asset),
+    remove: (project, id) => ipcRenderer.invoke('assets:remove', project, id),
+    copy: (text) => ipcRenderer.invoke('assets:copy', text)
+  },
+  stats: {
+    range: (start, end) => ipcRenderer.invoke('stats:range', start, end)
   }
 }
 

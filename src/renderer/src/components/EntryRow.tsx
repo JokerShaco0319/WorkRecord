@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { DailyEntry, EntryInput } from '@shared/md/month'
 import { parseEntryLine } from '@shared/md/month'
 import { CheckIcon, PencilIcon, TrashIcon } from './icons'
+import SmartInput from './SmartInput'
 
 interface Props {
   entry: DailyEntry
+  projects: string[]
+  tags: string[]
   onSave: (entry: DailyEntry, next: EntryInput) => void
   onRemove: (entry: DailyEntry) => void
 }
@@ -17,7 +20,7 @@ function toEditable(entry: DailyEntry): string {
   return parts.join(' ')
 }
 
-export default function EntryRow({ entry, onSave, onRemove }: Props) {
+export default function EntryRow({ entry, projects, tags, onSave, onRemove }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [confirming, setConfirming] = useState(false)
@@ -94,23 +97,17 @@ export default function EntryRow({ entry, onSave, onRemove }: Props) {
       </button>
 
       {editing ? (
-        <input
+        <SmartInput
           autoFocus
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={setDraft}
+          onSubmit={commit}
+          onCancel={cancel}
           onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-              event.preventDefault()
-              commit()
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              cancel()
-            }
-          }}
-          placeholder="内容，可写 [[项目]] 与 #标签"
+          placeholder="内容，@ 选项目、# 加标签"
           className="min-w-0 flex-1 bg-transparent text-sm leading-6 outline-none placeholder:text-muted/60"
+          projects={projects}
+          tags={tags}
         />
       ) : (
         <div className="min-w-0 flex-1">

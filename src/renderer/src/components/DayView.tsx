@@ -10,6 +10,7 @@ import {
 } from '@shared/date'
 import CalendarPanel from './CalendarPanel'
 import EntryRow from './EntryRow'
+import SmartInput from './SmartInput'
 import SourceEditor from './SourceEditor'
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from './icons'
 
@@ -26,6 +27,10 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [suggestions, setSuggestions] = useState<{ projects: string[]; tags: string[] }>({
+    projects: [],
+    tags: []
+  })
 
   const previousSelected = useRef(selected)
   const date = parseDateKey(selected)
@@ -53,6 +58,18 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
       void load(selected)
     })
   }, [load, selected])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([window.api.projects.list(), window.api.daily.tags()])
+      .then(([projects, tags]) => {
+        if (!cancelled) setSuggestions({ projects: projects.map((item) => item.name), tags })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
 
   const submit = useCallback(async () => {
     const content = text.trim()
@@ -206,18 +223,15 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
       {mode === 'list' ? (
         <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
           <div className="mx-auto w-full max-w-[820px]">
-            <div className="rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(0_0_0_/_0.04)] transition focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_var(--color-accent-soft)]">
-              <input
+            <div className="flex rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgb(0_0_0_/_0.04)] transition focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_var(--color-accent-soft)]">
+              <SmartInput
                 value={text}
-                onChange={(event) => setText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    event.preventDefault()
-                    void submit()
-                  }
-                }}
-                placeholder="记录一条…  可写 #标签 或 [[项目]]"
+                onChange={setText}
+                onSubmit={() => void submit()}
+                placeholder="记录一条…  输入 @ 选项目、# 选标签"
                 className="w-full bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted/70"
+                projects={suggestions.projects}
+                tags={suggestions.tags}
               />
             </div>
             <p className="mt-2 px-1 text-[11px] text-muted/70">按 Enter 保存，自动记下当前时间</p>
@@ -228,6 +242,8 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
                   <EntryRow
                     key={`${entry.line}-${entry.raw}`}
                     entry={entry}
+                    projects={suggestions.projects}
+                    tags={suggestions.tags}
                     onSave={saveEntry}
                     onRemove={removeEntry}
                   />
