@@ -129,3 +129,12 @@ export function TimerIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function GearIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <circle cx="8" cy="8" r="2.1" />
+      <path d="M8 1.6l.6 1.7c.6.1 1.2.4 1.7.7l1.6-.8 1.1 1.1-.8 1.6c.3.5.6 1.1.7 1.7l1.7.6v1.6l-1.7.6c-.1.6-.4 1.2-.7 1.7l.8 1.6-1.1 1.1-1.6-.8c-.5.3-1.1.6-1.7.7l-.6 1.7H8l-.6-1.7a4.8 4.8 0 01-1.7-.7l-1.6.8-1.1-1.1.8-1.6a4.8 4.8 0 01-.7-1.7L1.4 9.6V8l1.7-.6c.1-.6.4-1.2.7-1.7l-.8-1.6 1.1-1.1 1.6.8c.5-.3 1.1-.6 1.7-.7L8 1.6z" />
+    </svg>
+  )
+}

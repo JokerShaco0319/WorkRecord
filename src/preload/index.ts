@@ -4,7 +4,8 @@ import type { WorkRecordApi } from '@shared/api'
 const api: WorkRecordApi = {
   vault: {
     get: () => ipcRenderer.invoke('vault:get'),
-    choose: () => ipcRenderer.invoke('vault:choose')
+    choose: () => ipcRenderer.invoke('vault:choose'),
+    reveal: () => ipcRenderer.invoke('vault:reveal')
   },
   daily: {
     read: (date) => ipcRenderer.invoke('daily:read', date),
@@ -22,7 +23,9 @@ const api: WorkRecordApi = {
     update: (target, input) => ipcRenderer.invoke('todo:update', target, input),
     remove: (target) => ipcRenderer.invoke('todo:remove', target),
     move: (target, quadrant) => ipcRenderer.invoke('todo:move', target, quadrant),
-    toggle: (target) => ipcRenderer.invoke('todo:toggle', target)
+    toggle: (target) => ipcRenderer.invoke('todo:toggle', target),
+    archive: (month) => ipcRenderer.invoke('todo:archive', month),
+    restore: (month, target) => ipcRenderer.invoke('todo:restore', month, target)
   },
   projects: {
     list: () => ipcRenderer.invoke('projects:list'),
@@ -35,7 +38,8 @@ const api: WorkRecordApi = {
     preview: (week) => ipcRenderer.invoke('weekly:preview', week),
     read: (week) => ipcRenderer.invoke('weekly:read', week),
     generate: (week) => ipcRenderer.invoke('weekly:generate', week),
-    save: (week, raw) => ipcRenderer.invoke('weekly:save', week, raw)
+    save: (week, raw) => ipcRenderer.invoke('weekly:save', week, raw),
+    export: (week, text) => ipcRenderer.invoke('weekly:export', week, text)
   },
   files: {
     import: (project, category) => ipcRenderer.invoke('files:import', project, category),
@@ -54,11 +58,17 @@ const api: WorkRecordApi = {
     get: () => ipcRenderer.invoke('settings:get'),
     setTheme: (theme) => ipcRenderer.invoke('settings:set-theme', theme),
     setSecretClearSeconds: (seconds) =>
-      ipcRenderer.invoke('settings:set-secret-clear-seconds', seconds)
+      ipcRenderer.invoke('settings:set-secret-clear-seconds', seconds),
+    setLaunchAtLogin: (enabled) =>
+      ipcRenderer.invoke('settings:set-launch-at-login', enabled)
+  },
+  clipboard: {
+    write: (text) => ipcRenderer.invoke('clipboard:write', text)
   },
   capture: {
     submit: (text) => ipcRenderer.invoke('capture:submit', text),
-    close: () => ipcRenderer.invoke('capture:close')
+    close: () => ipcRenderer.invoke('capture:close'),
+    resize: (height) => ipcRenderer.invoke('capture:resize', height)
   },
   events: {
     onDataChanged: (listener) => {

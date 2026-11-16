@@ -1,9 +1,10 @@
-import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type {
   AppSettings,
   Asset,
+  CompletedTodo,
   MonthFile,
   ProjectDetail,
   SecurityStatus,
@@ -32,6 +33,7 @@ import {
   toggleTodo,
   updateTodo
 } from '@shared/md/todo'
+import type { ArchiveTarget } from '@shared/md/todoArchive'
 import {
   buildWeeklyBody,
   buildWeeklyFile,
@@ -49,7 +51,7 @@ import {
   readProject
 } from './projects'
 import { listAssets, removeAsset, saveAsset } from './assets'
-import { closeCapture } from './capture'
+import { closeCapture, resizeCapture } from './capture'
 import { listTags, searchVault } from './search'
 import {
   isConfigured,
@@ -59,6 +61,8 @@ import {
   unlockSession
 } from './security'
 import { computeStats, monthsBetween } from './stats'
+import { appendCompleted, listArchive, removeArchived } from './todoArchive'
+import type { AppConfig } from './vault'
 import {
   initializeVault,
   monthFilePath,
@@ -91,6 +95,14 @@ function assertWeek(week: string): void {
 }
 
 let clipboardClearTimer: NodeJS.Timeout | null = null
+
+function currentSettings(config: AppConfig): AppSettings {
+  return {
+    theme: config.theme,
+    secretClearSeconds: config.secretClearSeconds,
+    launchAtLogin: app.getLoginItemSettings().openAtLogin
+  }
+}
 
 async function requireVault(): Promise<string> {
   const config = await readAppConfig()
@@ -281,9 +293,61 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('todo:toggle', async (_event, target: TodoTarget): Promise<TodoDoc> => {
     const vaultPath = await requireVault()
-    const next = toggleTodo(await readTodoRaw(vaultPath), target, formatDateKey(new Date()))
+    const raw = await readTodoRaw(vaultPath)
+
+    const item = parseTodo(raw).items.find((entry) => entry.line === target.line)
+    if (!item) throw new Error('未找到对应待办，文件可能已被外部修改')
+    if (item.raw !== target.raw) throw new Error('待办内容已变化，请刷新后重试')
+
+    const today = formatDateKey(new Date())
+
+    if (!item.done) {
+      await appendCompleted(vaultPath, today.slice(0, 7), [
+        {
+          content: item.content,
+          project: item.project,
+          due: item.due,
+          doneDate: today,
+          quadrant: item.quadrant
+        }
+      ])
+      const next = removeTodo(raw, target)
+      await writeTodoRaw(vaultPath, next)
+      return parseTodo(next)
+    }
+
+    const next = toggleTodo(raw, target, today)
     await writeTodoRaw(vaultPath, next)
     return parseTodo(next)
+  })
+
+  ipcMain.handle('todo:archive', async (_event, month: string) => {
+    assertMonth(month)
+    const vaultPath = await requireVault()
+    return listArchive(vaultPath, month)
+  })
+
+  ipcMain.handle('todo:restore', async (_event, month: string, target: ArchiveTarget) => {
+    assertMonth(month)
+    const vaultPath = await requireVault()
+
+    const item = (await listArchive(vaultPath, month)).find((entry) => entry.line === target.line)
+    if (!item) throw new Error('未找到对应的归档事项')
+    if (item.raw !== target.raw) throw new Error('归档内容已变化，请刷新后重试')
+
+    const archived = await removeArchived(vaultPath, month, target)
+    const next = addTodo(await readTodoRaw(vaultPath), item.quadrant, {
+      content: item.content,
+      due: item.due,
+      project: item.project
+    })
+    await writeTodoRaw(vaultPath, next)
+    return archived
+  })
+
+  ipcMain.handle('vault:reveal', async (): Promise<void> => {
+    const vaultPath = await requireVault()
+    await shell.openPath(vaultPath)
   })
 
   ipcMain.handle('projects:list', async () => {
@@ -430,17 +494,36 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
   )
 
+  ipcMain.handle(
+    'weekly:export',
+    async (_event, week: string, text: string): Promise<boolean> => {
+      assertWeek(week)
+
+      const window = getWindow()
+      const options: Electron.SaveDialogOptions = {
+        title: '导出周报',
+        defaultPath: `${week} 周报.md`,
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      }
+      const result = window
+        ? await dialog.showSaveDialog(window, options)
+        : await dialog.showSaveDialog(options)
+
+      if (result.canceled || !result.filePath) return false
+      await writeFile(result.filePath, text, 'utf-8')
+      return true
+    }
+  )
+
   ipcMain.handle('settings:get', async (): Promise<AppSettings> => {
-    const config = await readAppConfig()
-    return { theme: config.theme, secretClearSeconds: config.secretClearSeconds }
+    return currentSettings(await readAppConfig())
   })
 
   ipcMain.handle(
     'settings:set-theme',
     async (_event, theme: 'light' | 'dark'): Promise<AppSettings> => {
       if (theme !== 'light' && theme !== 'dark') throw new Error(`非法的主题：${theme}`)
-      const config = await updateAppConfig({ theme })
-      return { theme: config.theme, secretClearSeconds: config.secretClearSeconds }
+      return currentSettings(await updateAppConfig({ theme }))
     }
   )
 
@@ -450,10 +533,21 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       if (!Number.isFinite(seconds) || seconds < 1 || seconds > 300) {
         throw new Error('自动清除时间需在 1 到 300 秒之间')
       }
-      const config = await updateAppConfig({ secretClearSeconds: Math.round(seconds) })
-      return { theme: config.theme, secretClearSeconds: config.secretClearSeconds }
+      return currentSettings(await updateAppConfig({ secretClearSeconds: Math.round(seconds) }))
     }
   )
+
+  ipcMain.handle(
+    'settings:set-launch-at-login',
+    async (_event, enabled: boolean): Promise<AppSettings> => {
+      app.setLoginItemSettings({ openAtLogin: Boolean(enabled), args: ['--hidden'] })
+      return currentSettings(await readAppConfig())
+    }
+  )
+
+  ipcMain.handle('clipboard:write', async (_event, text: string): Promise<void> => {
+    await clipboard.writeText(text)
+  })
 
   ipcMain.handle('search:query', async (_event, text: string, limit?: number) => {
     const vaultPath = await requireVault()
@@ -482,6 +576,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('capture:close', async (): Promise<void> => {
     closeCapture()
+  })
+
+  ipcMain.handle('capture:resize', async (_event, height: number): Promise<void> => {
+    resizeCapture(height)
   })
 
   ipcMain.handle('daily:tags', async (): Promise<string[]> => {
@@ -559,10 +657,22 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
       const vaultPath = await requireVault()
       const docs = []
+      const completed: CompletedTodo[] = []
+
       for (const month of monthsBetween(start, end)) {
         docs.push(parseMonth(month, await readMonthRaw(vaultPath, month)))
+        for (const item of await listArchive(vaultPath, month)) {
+          if (!item.doneDate || item.doneDate < start || item.doneDate > end) continue
+          completed.push({
+            content: item.content,
+            doneDate: item.doneDate,
+            project: item.project
+          })
+        }
       }
-      return computeStats(docs, start, end)
+
+      completed.sort((a, b) => b.doneDate.localeCompare(a.doneDate))
+      return { ...computeStats(docs, start, end), completed }
     }
   )
 }

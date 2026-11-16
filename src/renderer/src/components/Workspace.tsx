@@ -5,19 +5,19 @@ import {
   ChartIcon,
   CheckSquareIcon,
   FolderIcon,
-  MoonIcon,
+  GearIcon,
   SearchIcon,
-  SunIcon,
   TimerIcon
 } from './icons'
 import DayView from './DayView'
 import ProjectsView from './ProjectsView'
 import SearchOverlay from './SearchOverlay'
+import SettingsView from './SettingsView'
 import StatsView from './StatsView'
 import TodoView from './TodoView'
 import WeeklyView from './WeeklyView'
 
-type View = 'day' | 'todo' | 'projects' | 'weekly' | 'stats'
+type View = 'day' | 'todo' | 'projects' | 'weekly' | 'stats' | 'settings'
 
 interface NavItemProps {
   icon: ReactNode
@@ -108,7 +108,7 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
       <aside className="flex w-[212px] shrink-0 flex-col border-r border-line">
         <div className="px-5 pb-4 pt-6">
           <div className="flex items-center gap-2">
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-accent text-[11px] font-semibold text-white">
+            <span className="grid h-6 w-6 place-items-center rounded-md bg-ink text-[11px] font-semibold text-paper">
               W
             </span>
             <span className="text-[13px] font-semibold tracking-tight">WorkRecord</span>
@@ -174,26 +174,28 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
           />
         </nav>
 
-        <div className="mt-auto border-t border-line/70 px-5 py-4">
+        <div className="mt-auto border-t border-line/70 px-3 pb-4 pt-3">
           <button
             type="button"
-            data-action="toggle-theme"
-            onClick={onToggleTheme}
-            className="mb-3 flex items-center gap-2 text-[11px] text-muted transition-colors hover:text-ink"
+            data-action="nav-settings"
+            onClick={() => setView('settings')}
+            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+              view === 'settings'
+                ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0_/_0.05)]'
+                : 'text-muted hover:bg-surface/60'
+            }`}
           >
-            {theme === 'dark' ? (
-              <SunIcon className="h-3.5 w-3.5" />
-            ) : (
-              <MoonIcon className="h-3.5 w-3.5" />
-            )}
-            {theme === 'dark' ? '切换到浅色' : '切换到深色'}
+            <GearIcon className={`h-4 w-4 ${view === 'settings' ? 'text-accent' : ''}`} />
+            设置
           </button>
 
-          <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted/70">
-            数据目录
-          </div>
-          <div className="mt-1 truncate text-[11px] text-muted" title={vault.path ?? ''}>
-            {vault.path}
+          <div className="mt-3 px-3">
+            <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted/70">
+              数据目录
+            </div>
+            <div className="mt-1 truncate text-[11px] text-muted" title={vault.path ?? ''}>
+              {vault.path}
+            </div>
           </div>
         </div>
       </aside>
@@ -206,6 +208,9 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
           <WeeklyView key={weekSeed?.nonce ?? 'week'} initialWeek={weekSeed?.week} />
         )}
         {view === 'stats' && <StatsView />}
+        {view === 'settings' && (
+          <SettingsView vaultPath={vault.path} theme={theme} onToggleTheme={onToggleTheme} />
+        )}
       </main>
 
       {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} onOpen={openHit} />}

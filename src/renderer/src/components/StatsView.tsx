@@ -236,6 +236,40 @@ export default function StatsView() {
             )}
           </section>
 
+          <section className="mt-4 rounded-xl border border-line bg-surface p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[13px] font-medium">已完成待办</h2>
+              <span className="text-[10px] text-muted/60">
+                {report?.completed.length ?? 0} 项
+              </span>
+            </div>
+
+            {report && report.completed.length > 0 ? (
+              <ul className="mt-3 space-y-1.5">
+                {report.completed.map((item) => (
+                  <li
+                    key={`${item.doneDate}-${item.content}`}
+                    className="flex items-baseline gap-2 text-[12px]"
+                  >
+                    <span className="w-10 shrink-0 font-mono text-[11px] tabular-nums text-muted/70">
+                      {item.doneDate.slice(5)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-muted line-through decoration-muted/40">
+                      {item.content}
+                    </span>
+                    {item.project && (
+                      <span className="shrink-0 rounded bg-accent-soft px-1.5 py-px text-[10px] text-accent">
+                        {item.project}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-[12px] text-muted">这段时间没有完成的事项。</p>
+            )}
+          </section>
+
           {report && report.untimedCount > 0 && (
             <p className="mt-3 px-1 text-[11px] text-muted/70">
               有 {report.untimedCount} 条记录没有时间戳，未计入耗时。

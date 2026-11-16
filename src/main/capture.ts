@@ -8,6 +8,18 @@ export function closeCapture(): void {
   if (captureWindow && !captureWindow.isDestroyed()) captureWindow.close()
 }
 
+export function resizeCapture(height: number): void {
+  if (!captureWindow || captureWindow.isDestroyed()) return
+
+  const bounds = captureWindow.getBounds()
+  captureWindow.setBounds({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: Math.max(148, Math.min(420, Math.round(height)))
+  })
+}
+
 export function openCapture(): void {
   if (captureWindow && !captureWindow.isDestroyed()) {
     captureWindow.show()
@@ -60,13 +72,16 @@ export function openCapture(): void {
 
       const inputText = process.env.WORKRECORD_CAPTURE_SHOT_INPUT
       if (inputText) {
+        const pressEnter = process.env.WORKRECORD_CAPTURE_SHOT_ENTER
+          ? "input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))"
+          : ''
         await captureWindow?.webContents.executeJavaScript(`(() => {
           const input = document.querySelector('input')
           if (!input) return
           const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
           setter.call(input, ${JSON.stringify(inputText)})
           input.dispatchEvent(new Event('input', { bubbles: true }))
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+          ${pressEnter}
         })()`)
         await new Promise((resolve) => setTimeout(resolve, 900))
         if (captureWindow && !captureWindow.isDestroyed()) {

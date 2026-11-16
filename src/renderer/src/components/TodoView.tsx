@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { formatDateKey } from '@shared/date'
 import type { Quadrant, TodoDoc, TodoInput, TodoItem } from '@shared/md/todo'
 import { QUADRANTS, parseTodoItem } from '@shared/md/todo'
+import TodoArchive from './TodoArchive'
 import TodoRow from './TodoRow'
+import UndoToast from './UndoToast'
 
 type QuadrantMeta = (typeof QUADRANTS)[number]
 
@@ -115,8 +117,9 @@ export default function TodoView() {
 
   const [doc, setDoc] = useState<TodoDoc | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showDone, setShowDone] = useState(false)
+  const [mode, setMode] = useState<'board' | 'archive'>('board')
   const [dragging, setDragging] = useState<TodoItem | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<TodoItem | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -145,7 +148,49 @@ export default function TodoView() {
     raw: item.raw
   })
 
+  const handleRemove = useCallback(async (item: TodoItem) => {
+    try {
+      setDoc(await window.api.todo.remove(target(item)))
+      setPendingDelete(item)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }, [])
+
+  async function undoDelete(): Promise<void> {
+    const item = pendingDelete
+    if (!item) return
+
+    setPendingDelete(null)
+    try {
+      setDoc(
+        await window.api.todo.add(item.quadrant, {
+          content: item.content,
+          due: item.due,
+          project: item.project
+        })
+      )
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const dismissUndo = useCallback(() => setPendingDelete(null), [])
+
   const openCount = doc?.items.filter((item) => !item.done).length ?? 0
+
+  if (mode === 'archive') {
+    return (
+      <TodoArchive
+        onBack={() => {
+          setMode('board')
+          void load()
+        }}
+      />
+    )
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -162,15 +207,14 @@ export default function TodoView() {
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-center gap-1.5 pb-1 text-[11px] text-muted transition-colors hover:text-ink">
-              <input
-                type="checkbox"
-                checked={showDone}
-                onChange={(event) => setShowDone(event.target.checked)}
-                className="h-3 w-3 accent-[var(--color-accent)]"
-              />
-              显示已完成
-            </label>
+            <button
+              type="button"
+              data-action="todo-archive"
+              onClick={() => setMode('archive')}
+              className="h-7 rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink"
+            >
+              归档
+            </button>
           </div>
 
           {error && (
@@ -189,14 +233,14 @@ export default function TodoView() {
               quadrant={quadrant}
               items={
                 doc?.items.filter(
-                  (item) => item.quadrant === quadrant.key && (showDone || !item.done)
+                  (item) => item.quadrant === quadrant.key && !item.done
                 ) ?? []
               }
               today={today}
               onAdd={(key, input) => void run(window.api.todo.add(key, input))}
               onToggle={(item) => void run(window.api.todo.toggle(target(item)))}
               onSave={(item, input) => void run(window.api.todo.update(target(item), input))}
-              onRemove={(item) => void run(window.api.todo.remove(target(item)))}
+              onRemove={(item) => void handleRemove(item)}
               onDragStart={setDragging}
               onDragEnd={() => setDragging(null)}
               onDropItem={(key) => {
@@ -207,6 +251,14 @@ export default function TodoView() {
           ))}
         </div>
       </div>
+
+      {pendingDelete && (
+        <UndoToast
+          message="已删除 1 条待办"
+          onUndo={() => void undoDelete()}
+          onDismiss={dismissUndo}
+        />
+      )}
     </div>
   )
 }

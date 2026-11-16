@@ -20,7 +20,7 @@ export default function Welcome({ onReady }: { onReady: (vault: VaultInfo) => vo
   return (
     <div className="flex h-full items-center justify-center px-8">
       <div className="w-full max-w-[400px] text-center">
-        <div className="mb-7 inline-grid h-11 w-11 place-items-center rounded-xl bg-accent text-lg font-semibold text-white">
+        <div className="mb-7 inline-grid h-11 w-11 place-items-center rounded-xl bg-ink text-lg font-semibold text-paper">
           W
         </div>
         <h1 className="text-[26px] font-semibold tracking-tight">WorkRecord</h1>

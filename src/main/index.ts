@@ -7,12 +7,19 @@ import trayIcon from '../../resources/tray.png?asset'
 import { backupVault } from './backup'
 import { openCapture } from './capture'
 import { registerIpc } from './ipc'
+import { migrateCompletedTodos } from './todoArchive'
 import { readAppConfig } from './vault'
 
 app.setName('WorkRecord')
 
 if (process.env.WORKRECORD_USER_DATA) {
   app.setPath('userData', process.env.WORKRECORD_USER_DATA)
+}
+
+// 只允许一个实例：重复启动时把已有窗口唤到前台
+const isPrimaryInstance = app.requestSingleInstanceLock()
+if (!isPrimaryInstance) {
+  app.quit()
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -69,7 +76,10 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  const startHidden = process.argv.includes('--hidden')
+  mainWindow.once('ready-to-show', () => {
+    if (!startHidden) mainWindow?.show()
+  })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
@@ -168,6 +178,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  if (!isPrimaryInstance) return
+
   registerIpc(() => mainWindow)
   createWindow()
   createTray()
@@ -175,8 +187,11 @@ app.whenReady().then(() => {
   globalShortcut.register('CommandOrControl+Shift+Space', () => openCapture())
 
   void readAppConfig()
-    .then((config) => {
-      if (config.vaultPath) return backupVault(config.vaultPath, formatDateKey(new Date()))
+    .then(async (config) => {
+      if (!config.vaultPath) return
+      const today = formatDateKey(new Date())
+      await migrateCompletedTodos(config.vaultPath, today)
+      await backupVault(config.vaultPath, today)
     })
     .catch(() => {})
 
@@ -185,6 +200,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('second-instance', () => {
+  showMainWindow()
 })
 
 app.on('before-quit', () => {

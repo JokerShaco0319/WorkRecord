@@ -1,29 +1,11 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="96" y1="48" x2="416" y2="464" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3a8071" />
-      <stop offset="1" stop-color="#1f4f46" />
-    </linearGradient>
-    <linearGradient id="page" x1="160" y1="120" x2="352" y2="392" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" />
-      <stop offset="1" stop-color="#eef3f1" />
-    </linearGradient>
-  </defs>
-
-  <rect width="512" height="512" rx="116" fill="url(#bg)" />
-
-  <rect x="148" y="112" width="216" height="288" rx="32" fill="url(#page)" />
-
-  <rect x="188" y="176" width="136" height="20" rx="10" fill="#9db8b1" />
-  <rect x="188" y="224" width="136" height="20" rx="10" fill="#9db8b1" />
-  <rect x="188" y="272" width="88" height="20" rx="10" fill="#9db8b1" />
-
-  <circle cx="352" cy="360" r="70" fill="#2f6b5f" stroke="#f7f6f3" stroke-width="16" />
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#111111" />
   <path
-    d="M321 361l22 22 41-45"
+    d="M112 136 L172 380 L256 214 L340 380 L400 136"
+    fill="none"
     stroke="#ffffff"
-    stroke-width="20"
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    stroke-width="52"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
   />
 </svg>

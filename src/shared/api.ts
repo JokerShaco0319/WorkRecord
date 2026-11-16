@@ -1,5 +1,6 @@
 import type { DayDoc, EntryInput, EntryTarget } from './md/month'
 import type { Quadrant, TodoDoc, TodoInput, TodoTarget } from './md/todo'
+import type { ArchiveItem, ArchiveTarget } from './md/todoArchive'
 
 export interface VaultInfo {
   path: string | null
@@ -48,6 +49,7 @@ export type SearchHit =
 export interface AppSettings {
   theme: 'light' | 'dark'
   secretClearSeconds: number
+  launchAtLogin: boolean
 }
 
 export interface AssetField {
@@ -81,6 +83,12 @@ export interface DayStat {
   minutes: number
 }
 
+export interface CompletedTodo {
+  content: string
+  doneDate: string
+  project: string | null
+}
+
 export interface StatsReport {
   start: string
   end: string
@@ -89,12 +97,14 @@ export interface StatsReport {
   untimedCount: number
   projects: ProjectStat[]
   days: DayStat[]
+  completed: CompletedTodo[]
 }
 
 export interface WorkRecordApi {
   vault: {
     get(): Promise<VaultInfo>
     choose(): Promise<VaultInfo>
+    reveal(): Promise<void>
   }
   daily: {
     read(date: string): Promise<DayDoc>
@@ -112,6 +122,8 @@ export interface WorkRecordApi {
     remove(target: TodoTarget): Promise<TodoDoc>
     move(target: TodoTarget, quadrant: Quadrant): Promise<TodoDoc>
     toggle(target: TodoTarget): Promise<TodoDoc>
+    archive(month: string): Promise<ArchiveItem[]>
+    restore(month: string, target: ArchiveTarget): Promise<ArchiveItem[]>
   }
   projects: {
     list(): Promise<ProjectSummary[]>
@@ -125,6 +137,7 @@ export interface WorkRecordApi {
     read(week: string): Promise<string | null>
     generate(week: string): Promise<string>
     save(week: string, raw: string): Promise<string>
+    export(week: string, text: string): Promise<boolean>
   }
   files: {
     import(project: string, category: string): Promise<ProjectDetail | null>
@@ -141,10 +154,15 @@ export interface WorkRecordApi {
     get(): Promise<AppSettings>
     setTheme(theme: 'light' | 'dark'): Promise<AppSettings>
     setSecretClearSeconds(seconds: number): Promise<AppSettings>
+    setLaunchAtLogin(enabled: boolean): Promise<AppSettings>
+  }
+  clipboard: {
+    write(text: string): Promise<void>
   }
   capture: {
     submit(text: string): Promise<void>
     close(): Promise<void>
+    resize(height: number): Promise<void>
   }
   events: {
     onDataChanged(listener: () => void): () => void

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface Props {
   value: string
@@ -11,6 +11,7 @@ interface Props {
   autoFocus?: boolean
   projects: string[]
   tags: string[]
+  onPopupChange?: (open: boolean) => void
 }
 
 interface Suggestion {
@@ -58,11 +59,14 @@ export default function SmartInput({
   className,
   autoFocus,
   projects,
-  tags
+  tags,
+  onPopupChange
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
   const [active, setActive] = useState(0)
+  const onPopupChangeRef = useRef(onPopupChange)
+  onPopupChangeRef.current = onPopupChange
 
   const items = useMemo(() => {
     if (!suggestion) return []
@@ -95,6 +99,10 @@ export default function SmartInput({
   }
 
   const open = suggestion !== null && items.length > 0
+
+  useEffect(() => {
+    onPopupChangeRef.current?.(open)
+  }, [open])
 
   return (
     <div className="relative min-w-0 flex-1">

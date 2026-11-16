@@ -12,6 +12,7 @@ import CalendarPanel from './CalendarPanel'
 import EntryRow from './EntryRow'
 import SmartInput from './SmartInput'
 import SourceEditor from './SourceEditor'
+import UndoToast from './UndoToast'
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from './icons'
 
 type Mode = 'list' | 'source'
@@ -31,6 +32,8 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
     projects: [],
     tags: []
   })
+  const [previousEntries, setPreviousEntries] = useState<DailyEntry[]>([])
+  const [pendingDelete, setPendingDelete] = useState<DailyEntry | null>(null)
 
   const previousSelected = useRef(selected)
   const date = parseDateKey(selected)
@@ -71,6 +74,75 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
     }
   }, [refreshKey])
 
+  const previousKey = addDaysKey(selected, -1)
+
+  useEffect(() => {
+    let cancelled = false
+
+    window.api.daily
+      .read(previousKey)
+      .then((next) => {
+        if (!cancelled) setPreviousEntries(next.entries.filter((entry) => !entry.done))
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [previousKey, refreshKey])
+
+  const carryables = previousEntries.filter(
+    (prev) =>
+      !doc?.entries.some(
+        (entry) => entry.content === prev.content && entry.project === prev.project
+      )
+  )
+
+  async function carryOver(): Promise<void> {
+    if (carryables.length === 0) return
+
+    try {
+      let next: DayDoc | null = doc
+      for (const entry of carryables) {
+        next = await window.api.daily.appendEntry(selected, {
+          time: null,
+          project: entry.project,
+          content: entry.content,
+          tags: entry.tags,
+          done: false
+        })
+      }
+      if (next) setDoc(next)
+      setPreviousEntries([])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function undoDelete(): Promise<void> {
+    const entry = pendingDelete
+    if (!entry) return
+
+    setPendingDelete(null)
+    try {
+      setDoc(
+        await window.api.daily.appendEntry(selected, {
+          time: entry.time,
+          project: entry.project,
+          content: entry.content,
+          tags: entry.tags,
+          done: entry.done
+        })
+      )
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const dismissUndo = useCallback(() => setPendingDelete(null), [])
+
   const submit = useCallback(async () => {
     const content = text.trim()
     if (!content || busy) return
@@ -109,6 +181,7 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
     async (entry: DailyEntry) => {
       try {
         setDoc(await window.api.daily.removeEntry(selected, { line: entry.line, raw: entry.raw }))
+        setPendingDelete(entry)
         setError(null)
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
@@ -236,9 +309,24 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
             </div>
             <p className="mt-2 px-1 text-[11px] text-muted/70">按 Enter 保存，自动记下当前时间</p>
 
+            {carryables.length > 0 && (
+              <button
+                type="button"
+                data-action="carry-over"
+                onClick={() => void carryOver()}
+                className="mt-1 block px-1 text-[11px] text-accent transition-opacity hover:opacity-70"
+              >
+                带入 {previousKey.slice(5)} 的 {carryables.length} 条未完成记录
+              </button>
+            )}
+
             {doc && doc.entries.length > 0 ? (
               <ol className="mt-6 space-y-0.5">
-                {doc.entries.map((entry) => (
+                {[...doc.entries]
+                  .sort((a, b) =>
+                    (a.time ?? '99:99').localeCompare(b.time ?? '99:99')
+                  )
+                  .map((entry) => (
                   <EntryRow
                     key={`${entry.line}-${entry.raw}`}
                     entry={entry}
@@ -272,6 +360,14 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
             onError={setError}
           />
         </div>
+      )}
+
+      {pendingDelete && (
+        <UndoToast
+          message="已删除 1 条记录"
+          onUndo={() => void undoDelete()}
+          onDismiss={dismissUndo}
+        />
       )}
     </div>
   )

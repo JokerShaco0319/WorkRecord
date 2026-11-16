@@ -1,10 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
+import { stripFrontmatter } from '@shared/md/section'
 import type { WeeklyPreview } from '@shared/api'
 import { addDaysKey, formatDateKey, formatMonthDay } from '@shared/date'
 import { isoWeekKey, weekRangeFromKey } from '@shared/md/weekly'
 import MarkdownPreview from './MarkdownPreview'
 import SourceEditor from './SourceEditor'
 import { ChevronLeftIcon, ChevronRightIcon } from './icons'
+
+/** 导出/复制时去掉 frontmatter 与自动区块标记 */
+function reportText(raw: string): string {
+  return stripFrontmatter(raw)
+    .split('\n')
+    .filter(
+      (line) => !line.includes('<!-- auto:start -->') && !line.includes('<!-- auto:end -->')
+    )
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
 export default function WeeklyView({ initialWeek }: { initialWeek?: string }) {
   const [week, setWeek] = useState(
@@ -15,6 +28,7 @@ export default function WeeklyView({ initialWeek }: { initialWeek?: string }) {
   const [mode, setMode] = useState<'view' | 'source'>('view')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const range = weekRangeFromKey(week)
   const currentWeek = isoWeekKey(formatDateKey(new Date()))
@@ -57,6 +71,23 @@ export default function WeeklyView({ initialWeek }: { initialWeek?: string }) {
   }, [week, load])
 
   const content = fileRaw ?? preview?.body ?? ''
+
+  async function copyReport(): Promise<void> {
+    if (!content) return
+    await window.api.clipboard.write(reportText(content))
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  async function exportReport(): Promise<void> {
+    if (!content) return
+    try {
+      await window.api.weekly.export(week, reportText(content))
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -104,6 +135,25 @@ export default function WeeklyView({ initialWeek }: { initialWeek?: string }) {
                   回到本周
                 </button>
               )}
+
+              <button
+                type="button"
+                data-action="weekly-copy"
+                onClick={() => void copyReport()}
+                disabled={!content}
+                className="ml-2 h-7 rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink disabled:opacity-50"
+              >
+                {copied ? '已复制' : '复制'}
+              </button>
+              <button
+                type="button"
+                data-action="weekly-export"
+                onClick={() => void exportReport()}
+                disabled={!content}
+                className="ml-1 h-7 rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink disabled:opacity-50"
+              >
+                导出
+              </button>
 
               {fileRaw && (
                 <button

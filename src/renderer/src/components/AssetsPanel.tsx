@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent
+} from 'react'
 import type { Asset, AssetField, SecurityStatus } from '@shared/api'
 
 let counter = 0
@@ -72,14 +78,53 @@ export default function AssetsPanel({ project }: { project: string }) {
     }
   }, [])
 
-  async function saveSeconds(): Promise<void> {
-    try {
-      const settings = await window.api.settings.setSecretClearSeconds(clearSeconds)
-      setClearSeconds(settings.secretClearSeconds)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+  function addField(): void {
+    if (!draft) return
+
+    const id = newId()
+    setDraft({ ...draft, fields: [...draft.fields, { id, label: '', value: '', secret: true }] })
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>(`[data-field-label="${id}"]`)?.focus()
+    })
+  }
+
+  function handleEditorKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
+    const target = event.target as HTMLElement
+    if (!target.hasAttribute('data-asset-input')) return
+
+    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+      event.preventDefault()
+      addField()
+      return
     }
+
+    if (event.key !== 'Tab') return
+
+    const container = event.currentTarget
+    const inputs = Array.from(container.querySelectorAll<HTMLElement>('[data-asset-input]'))
+    const index = inputs.indexOf(target)
+    if (index === -1) return
+
+    const next = event.shiftKey ? inputs[index - 1] : inputs[index + 1]
+    if (next) {
+      event.preventDefault()
+      next.focus()
+      return
+    }
+
+    // 走过最后一个字段后跳到保存，备注只接受鼠标点击
+    if (!event.shiftKey && index === inputs.length - 1) {
+      event.preventDefault()
+      container.querySelector<HTMLButtonElement>('[data-action="asset-save"]')?.focus()
+    }
+  }
+
+  function assetText(asset: Asset): string {
+    const lines = asset.fields
+      .filter((field) => field.value.trim())
+      .map((field) => `${field.label || '字段'}: ${field.value}`)
+    if (asset.notes.trim()) lines.push(asset.notes.trim())
+    return lines.join('\n')
   }
 
   async function setup(): Promise<void> {
@@ -305,32 +350,14 @@ export default function AssetsPanel({ project }: { project: string }) {
             </div>
           </div>
 
-          <div className="mb-3 flex items-center justify-between text-[11px] text-muted">
-            <span>显示的字段与复制的值会自动清除</span>
-            <label className="flex items-center gap-1">
-              <input
-                type="number"
-                min={1}
-                max={300}
-                value={clearSeconds}
-                onChange={(event) => setClearSeconds(Number(event.target.value) || 1)}
-                onBlur={() => void saveSeconds()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    event.preventDefault()
-                    void saveSeconds()
-                  }
-                }}
-                className="w-12 rounded border border-line bg-paper px-1.5 py-0.5 text-center text-[11px] outline-none focus:border-accent/50"
-              />
-              秒后清除
-            </label>
-          </div>
-
           {draft && (
-            <div className="mb-3 rounded-xl border border-accent/40 bg-surface p-4">
+            <div
+              className="mb-3 rounded-xl border border-accent/40 bg-surface p-4"
+              onKeyDown={handleEditorKeyDown}
+            >
               <input
                 autoFocus
+                data-asset-input
                 value={draft.title}
                 onChange={(event) => setDraft({ ...draft, title: event.target.value })}
                 placeholder="名称，例如：服务器账号"
@@ -341,19 +368,24 @@ export default function AssetsPanel({ project }: { project: string }) {
                 {draft.fields.map((field) => (
                   <div key={field.id} className="flex items-center gap-1.5">
                     <input
+                      data-asset-input
+                      data-field-label={field.id}
                       value={field.label}
                       onChange={(event) => updateField(field.id, { label: event.target.value })}
                       placeholder="字段名"
                       className="w-24 shrink-0 rounded-md border border-line bg-paper px-2 py-1 text-[12px] outline-none focus:border-accent/50"
                     />
                     <input
-                      type={field.secret ? 'password' : 'text'}
+                      data-asset-input
                       value={field.value}
                       onChange={(event) => updateField(field.id, { value: event.target.value })}
                       placeholder="内容"
                       className="min-w-0 flex-1 rounded-md border border-line bg-paper px-2 py-1 text-[12px] outline-none focus:border-accent/50"
                     />
-                    <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted">
+                    <label
+                      title="勾选后，保存的内容在资产列表中显示为圆点，点「显示」才能看到"
+                      className="flex shrink-0 items-center gap-1 text-[11px] text-muted"
+                    >
                       <input
                         type="checkbox"
                         checked={field.secret}
@@ -362,7 +394,7 @@ export default function AssetsPanel({ project }: { project: string }) {
                         }
                         className="h-3 w-3 accent-[var(--color-accent)]"
                       />
-                      隐藏
+                      保存后隐藏
                     </label>
                     <button
                       type="button"
@@ -382,15 +414,7 @@ export default function AssetsPanel({ project }: { project: string }) {
 
               <button
                 type="button"
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    fields: [
-                      ...draft.fields,
-                      { id: newId(), label: '', value: '', secret: true }
-                    ]
-                  })
-                }
+                onClick={() => addField()}
                 className="mt-2 text-[11px] text-accent transition-opacity hover:opacity-70"
               >
                 + 添加字段
@@ -431,7 +455,18 @@ export default function AssetsPanel({ project }: { project: string }) {
             {assets.map((asset) => (
               <div key={asset.id} className="rounded-xl border border-line bg-surface p-3.5">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-[13px] font-medium">{asset.title}</span>
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <span
+                      onDoubleClick={() => void copy(assetText(asset), `${asset.id}-all`)}
+                      title="双击复制整条资产"
+                      className="truncate text-[13px] font-medium"
+                    >
+                      {asset.title}
+                    </span>
+                    {copied === `${asset.id}-all` && (
+                      <span className="shrink-0 text-[10px] text-accent">已复制</span>
+                    )}
+                  </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <button
                       type="button"
@@ -466,7 +501,12 @@ export default function AssetsPanel({ project }: { project: string }) {
                 {asset.fields.length > 0 && (
                   <dl className="mt-2 space-y-1">
                     {asset.fields.map((field) => (
-                      <div key={field.id} className="flex items-center gap-2 text-[12px]">
+                      <div
+                        key={field.id}
+                        onDoubleClick={() => void copy(field.value, field.id)}
+                        title="双击复制该字段"
+                        className="flex items-center gap-2 text-[12px]"
+                      >
                         <dt className="w-16 shrink-0 truncate text-muted">
                           {field.label || '未命名字段'}
                         </dt>
