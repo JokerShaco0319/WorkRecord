@@ -1,0 +1,461 @@
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import type {
+  AppSettings,
+  MonthFile,
+  ProjectDetail,
+  VaultInfo,
+  WeeklyPreview
+} from '@shared/api'
+import { formatDateKey, formatTimeHm, monthKeyForDate } from '@shared/date'
+import type { DayDoc, EntryInput, EntryTarget } from '@shared/md/month'
+import {
+  appendEntry,
+  dayDoc,
+  monthTemplate,
+  parseMonth,
+  removeEntry,
+  serializeEntry,
+  updateEntry
+} from '@shared/md/month'
+import type { Quadrant, TodoDoc, TodoInput, TodoTarget } from '@shared/md/todo'
+import {
+  addTodo,
+  moveTodo,
+  parseTodo,
+  removeTodo,
+  todoTemplate,
+  toggleTodo,
+  updateTodo
+} from '@shared/md/todo'
+import {
+  buildWeeklyBody,
+  buildWeeklyFile,
+  collectWeekEntries,
+  mergeAutoBlock,
+  weekRangeFromKey
+} from '@shared/md/weekly'
+import {
+  addCategory,
+  createProject,
+  importFiles,
+  listProjects,
+  projectDirPath,
+  projectFilePath,
+  readProject
+} from './projects'
+import { closeCapture } from './capture'
+import { searchVault } from './search'
+import {
+  initializeVault,
+  monthFilePath,
+  readAppConfig,
+  updateAppConfig,
+  weeklyFilePath
+} from './vault'
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const MONTH_RE = /^\d{4}-\d{2}$/
+
+function assertDate(date: string): void {
+  if (!DATE_RE.test(date)) throw new Error(`非法的日期：${date}`)
+}
+
+function assertMonth(month: string): void {
+  if (!MONTH_RE.test(month)) throw new Error(`非法的月份：${month}`)
+}
+
+const QUADRANT_KEYS: Quadrant[] = ['q1', 'q2', 'q3', 'q4']
+
+function assertQuadrant(value: string): asserts value is Quadrant {
+  if (!QUADRANT_KEYS.includes(value as Quadrant)) throw new Error(`非法的象限：${value}`)
+}
+
+const WEEK_RE = /^\d{4}-W\d{2}$/
+
+function assertWeek(week: string): void {
+  if (!WEEK_RE.test(week)) throw new Error(`非法的周次：${week}`)
+}
+
+async function requireVault(): Promise<string> {
+  const config = await readAppConfig()
+  if (!config.vaultPath) throw new Error('尚未选择数据目录')
+  return config.vaultPath
+}
+
+async function readMonthRaw(vaultPath: string, month: string): Promise<string> {
+  try {
+    return await readFile(monthFilePath(vaultPath, month), 'utf-8')
+  } catch {
+    return monthTemplate(month)
+  }
+}
+
+async function writeMonthRaw(vaultPath: string, month: string, raw: string): Promise<void> {
+  const filePath = monthFilePath(vaultPath, month)
+  await mkdir(dirname(filePath), { recursive: true })
+  await writeFile(filePath, raw, 'utf-8')
+}
+
+function todoFilePath(vaultPath: string): string {
+  return join(vaultPath, 'todo.md')
+}
+
+async function readTodoRaw(vaultPath: string): Promise<string> {
+  try {
+    return await readFile(todoFilePath(vaultPath), 'utf-8')
+  } catch {
+    return todoTemplate()
+  }
+}
+
+async function writeTodoRaw(vaultPath: string, raw: string): Promise<void> {
+  await writeFile(todoFilePath(vaultPath), raw, 'utf-8')
+}
+
+async function weeklyContext(vaultPath: string, week: string) {
+  assertWeek(week)
+  const range = weekRangeFromKey(week)
+  const month = range.start.slice(0, 7)
+  const monthDoc = parseMonth(month, await readMonthRaw(vaultPath, month))
+  return {
+    range,
+    entries: collectWeekEntries(monthDoc, range.start, range.end),
+    todos: parseTodo(await readTodoRaw(vaultPath)).items
+  }
+}
+
+export function registerIpc(getWindow: () => BrowserWindow | null): void {
+  ipcMain.handle('vault:get', async (): Promise<VaultInfo> => {
+    const config = await readAppConfig()
+    return { path: config.vaultPath }
+  })
+
+  ipcMain.handle('vault:choose', async (): Promise<VaultInfo> => {
+    const window = getWindow()
+    const options: Electron.OpenDialogOptions = {
+      title: '选择数据目录',
+      buttonLabel: '使用此目录',
+      properties: ['openDirectory', 'createDirectory']
+    }
+    const result = window
+      ? await dialog.showOpenDialog(window, options)
+      : await dialog.showOpenDialog(options)
+
+    if (result.canceled || result.filePaths.length === 0) {
+      const config = await readAppConfig()
+      return { path: config.vaultPath }
+    }
+
+    const vaultPath = result.filePaths[0]
+    await initializeVault(vaultPath)
+    await updateAppConfig({ vaultPath })
+    return { path: vaultPath }
+  })
+
+  ipcMain.handle('daily:read', async (_event, date: string): Promise<DayDoc> => {
+    assertDate(date)
+    const vaultPath = await requireVault()
+    const month = monthKeyForDate(date)
+    return dayDoc(parseMonth(month, await readMonthRaw(vaultPath, month)), date)
+  })
+
+  ipcMain.handle(
+    'daily:append-entry',
+    async (_event, date: string, input: EntryInput): Promise<DayDoc> => {
+      assertDate(date)
+      const vaultPath = await requireVault()
+      const month = monthKeyForDate(date)
+      const raw = await readMonthRaw(vaultPath, month)
+      const next = appendEntry(raw, month, date, serializeEntry(input))
+
+      await writeMonthRaw(vaultPath, month, next)
+      return dayDoc(parseMonth(month, next), date)
+    }
+  )
+
+  ipcMain.handle(
+    'daily:update-entry',
+    async (
+      _event,
+      date: string,
+      target: EntryTarget,
+      input: EntryInput
+    ): Promise<DayDoc> => {
+      assertDate(date)
+      const vaultPath = await requireVault()
+      const month = monthKeyForDate(date)
+      const raw = await readMonthRaw(vaultPath, month)
+      const next = updateEntry(raw, month, date, target, serializeEntry(input))
+
+      await writeMonthRaw(vaultPath, month, next)
+      return dayDoc(parseMonth(month, next), date)
+    }
+  )
+
+  ipcMain.handle('daily:remove-entry', async (_event, date: string, target: EntryTarget) => {
+    assertDate(date)
+    const vaultPath = await requireVault()
+    const month = monthKeyForDate(date)
+    const raw = await readMonthRaw(vaultPath, month)
+    const next = removeEntry(raw, month, date, target)
+
+    await writeMonthRaw(vaultPath, month, next)
+    return dayDoc(parseMonth(month, next), date)
+  })
+
+  ipcMain.handle('daily:read-month', async (_event, month: string): Promise<MonthFile> => {
+    assertMonth(month)
+    const vaultPath = await requireVault()
+    return { month, raw: await readMonthRaw(vaultPath, month) }
+  })
+
+  ipcMain.handle(
+    'daily:save-month',
+    async (_event, month: string, raw: string): Promise<MonthFile> => {
+      assertMonth(month)
+      const vaultPath = await requireVault()
+      await writeMonthRaw(vaultPath, month, raw)
+      return { month, raw }
+    }
+  )
+
+  ipcMain.handle('todo:read', async (): Promise<TodoDoc> => {
+    const vaultPath = await requireVault()
+    return parseTodo(await readTodoRaw(vaultPath))
+  })
+
+  ipcMain.handle(
+    'todo:add',
+    async (_event, quadrant: Quadrant, input: TodoInput): Promise<TodoDoc> => {
+      assertQuadrant(quadrant)
+      const vaultPath = await requireVault()
+      const next = addTodo(await readTodoRaw(vaultPath), quadrant, input)
+      await writeTodoRaw(vaultPath, next)
+      return parseTodo(next)
+    }
+  )
+
+  ipcMain.handle(
+    'todo:update',
+    async (_event, target: TodoTarget, input: TodoInput): Promise<TodoDoc> => {
+      const vaultPath = await requireVault()
+      const next = updateTodo(await readTodoRaw(vaultPath), target, input)
+      await writeTodoRaw(vaultPath, next)
+      return parseTodo(next)
+    }
+  )
+
+  ipcMain.handle('todo:remove', async (_event, target: TodoTarget): Promise<TodoDoc> => {
+    const vaultPath = await requireVault()
+    const next = removeTodo(await readTodoRaw(vaultPath), target)
+    await writeTodoRaw(vaultPath, next)
+    return parseTodo(next)
+  })
+
+  ipcMain.handle(
+    'todo:move',
+    async (_event, target: TodoTarget, quadrant: Quadrant): Promise<TodoDoc> => {
+      assertQuadrant(quadrant)
+      const vaultPath = await requireVault()
+      const next = moveTodo(await readTodoRaw(vaultPath), target, quadrant)
+      await writeTodoRaw(vaultPath, next)
+      return parseTodo(next)
+    }
+  )
+
+  ipcMain.handle('todo:toggle', async (_event, target: TodoTarget): Promise<TodoDoc> => {
+    const vaultPath = await requireVault()
+    const next = toggleTodo(await readTodoRaw(vaultPath), target, formatDateKey(new Date()))
+    await writeTodoRaw(vaultPath, next)
+    return parseTodo(next)
+  })
+
+  ipcMain.handle('projects:list', async () => {
+    const vaultPath = await requireVault()
+    return listProjects(vaultPath)
+  })
+
+  ipcMain.handle('projects:create', async (_event, name: string): Promise<ProjectDetail> => {
+    const vaultPath = await requireVault()
+    await createProject(vaultPath, name, formatDateKey(new Date()))
+    return readProject(vaultPath, name.trim())
+  })
+
+  ipcMain.handle('projects:read', async (_event, name: string): Promise<ProjectDetail> => {
+    const vaultPath = await requireVault()
+    return readProject(vaultPath, name)
+  })
+
+  ipcMain.handle(
+    'projects:add-category',
+    async (_event, name: string, category: string): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await addCategory(vaultPath, name, category, formatDateKey(new Date()))
+      return readProject(vaultPath, name)
+    }
+  )
+
+  ipcMain.handle('projects:reveal', async (_event, name: string): Promise<void> => {
+    const vaultPath = await requireVault()
+    await shell.openPath(projectDirPath(vaultPath, name))
+  })
+
+  ipcMain.handle(
+    'files:import',
+    async (_event, project: string, category: string): Promise<ProjectDetail | null> => {
+      const vaultPath = await requireVault()
+      const window = getWindow()
+      const options: Electron.OpenDialogOptions = {
+        title: '选择要导入的文件',
+        buttonLabel: '导入',
+        properties: ['openFile', 'multiSelections']
+      }
+      const result = window
+        ? await dialog.showOpenDialog(window, options)
+        : await dialog.showOpenDialog(options)
+
+      if (result.canceled || result.filePaths.length === 0) return null
+
+      await importFiles(vaultPath, project, category, result.filePaths)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:import-paths',
+    async (
+      _event,
+      project: string,
+      category: string,
+      paths: string[]
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await importFiles(vaultPath, project, category, paths)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:open',
+    async (_event, project: string, category: string, name: string): Promise<void> => {
+      const vaultPath = await requireVault()
+      const error = await shell.openPath(projectFilePath(vaultPath, project, category, name))
+      if (error) throw new Error(error)
+    }
+  )
+
+  ipcMain.handle(
+    'files:reveal',
+    async (_event, project: string, category: string, name: string): Promise<void> => {
+      const vaultPath = await requireVault()
+      shell.showItemInFolder(projectFilePath(vaultPath, project, category, name))
+    }
+  )
+
+  ipcMain.handle(
+    'files:trash',
+    async (
+      _event,
+      project: string,
+      category: string,
+      name: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await shell.trashItem(projectFilePath(vaultPath, project, category, name))
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle('weekly:preview', async (_event, week: string): Promise<WeeklyPreview> => {
+    const vaultPath = await requireVault()
+    const { range, entries, todos } = await weeklyContext(vaultPath, week)
+    const body = buildWeeklyBody(entries, todos, range.end)
+
+    return {
+      week: range.key,
+      start: range.start,
+      end: range.end,
+      title: range.title,
+      body,
+      entryCount: entries.length,
+      projectCount: new Set(entries.map((entry) => entry.project ?? '其他')).size
+    }
+  })
+
+  ipcMain.handle('weekly:read', async (_event, week: string): Promise<string | null> => {
+    assertWeek(week)
+    const vaultPath = await requireVault()
+    return readFile(weeklyFilePath(vaultPath, week), 'utf-8').catch(() => null)
+  })
+
+  ipcMain.handle('weekly:generate', async (_event, week: string): Promise<string> => {
+    const vaultPath = await requireVault()
+    const { range, entries, todos } = await weeklyContext(vaultPath, week)
+    const body = buildWeeklyBody(entries, todos, range.end)
+
+    const filePath = weeklyFilePath(vaultPath, week)
+    const existing = await readFile(filePath, 'utf-8').catch(() => null)
+    const next = existing ? mergeAutoBlock(existing, body) : buildWeeklyFile(range, body)
+
+    await mkdir(dirname(filePath), { recursive: true })
+    await writeFile(filePath, next, 'utf-8')
+    return next
+  })
+
+  ipcMain.handle(
+    'weekly:save',
+    async (_event, week: string, raw: string): Promise<string> => {
+      assertWeek(week)
+      const vaultPath = await requireVault()
+      const filePath = weeklyFilePath(vaultPath, week)
+      await mkdir(dirname(filePath), { recursive: true })
+      await writeFile(filePath, raw, 'utf-8')
+      return raw
+    }
+  )
+
+  ipcMain.handle('settings:get', async (): Promise<AppSettings> => {
+    const config = await readAppConfig()
+    return { theme: config.theme }
+  })
+
+  ipcMain.handle(
+    'settings:set-theme',
+    async (_event, theme: 'light' | 'dark'): Promise<AppSettings> => {
+      if (theme !== 'light' && theme !== 'dark') throw new Error(`非法的主题：${theme}`)
+      const config = await updateAppConfig({ theme })
+      return { theme: config.theme }
+    }
+  )
+
+  ipcMain.handle('search:query', async (_event, text: string, limit?: number) => {
+    const vaultPath = await requireVault()
+    return searchVault(vaultPath, text, limit ?? 60)
+  })
+
+  ipcMain.handle('capture:submit', async (_event, text: string): Promise<void> => {
+    const content = text.trim()
+    if (!content) return
+
+    const vaultPath = await requireVault()
+    const today = formatDateKey(new Date())
+    const month = monthKeyForDate(today)
+    const raw = await readMonthRaw(vaultPath, month)
+    const next = appendEntry(
+      raw,
+      month,
+      today,
+      serializeEntry({ time: formatTimeHm(new Date()), content })
+    )
+
+    await writeMonthRaw(vaultPath, month, next)
+    getWindow()?.webContents.send('data:changed')
+    closeCapture()
+  })
+
+  ipcMain.handle('capture:close', async (): Promise<void> => {
+    closeCapture()
+  })
+}
