@@ -1,4 +1,5 @@
 import type { DayDoc, EntryInput, EntryTarget } from './md/month'
+import type { ProjectStatus } from './md/project'
 import type { Quadrant, TodoDoc, TodoInput, TodoTarget } from './md/todo'
 import type { ArchiveItem, ArchiveTarget } from './md/todoArchive'
 
@@ -22,8 +23,14 @@ export interface ProjectSummary {
   name: string
   description: string
   categories: string[]
+  status: ProjectStatus
   fileCount: number
   updatedAt: string | null
+}
+
+export interface BackupInfo {
+  date: string
+  files: number
 }
 
 export interface ProjectDetail extends ProjectSummary {
@@ -130,6 +137,7 @@ export interface WorkRecordApi {
     create(name: string): Promise<ProjectDetail>
     read(name: string): Promise<ProjectDetail>
     addCategory(name: string, category: string): Promise<ProjectDetail>
+    setStatus(name: string, status: ProjectStatus): Promise<ProjectDetail>
     reveal(name: string): Promise<void>
   }
   weekly: {
@@ -145,7 +153,23 @@ export interface WorkRecordApi {
     open(project: string, category: string, name: string): Promise<void>
     reveal(project: string, category: string, name: string): Promise<void>
     trash(project: string, category: string, name: string): Promise<ProjectDetail>
+    rename(
+      project: string,
+      category: string,
+      name: string,
+      newName: string
+    ): Promise<ProjectDetail>
+    move(
+      project: string,
+      category: string,
+      name: string,
+      toCategory: string
+    ): Promise<ProjectDetail>
     pathOf(file: File): string
+  }
+  backups: {
+    list(): Promise<BackupInfo[]>
+    restore(date: string): Promise<number>
   }
   search: {
     query(text: string, limit?: number): Promise<SearchHit[]>

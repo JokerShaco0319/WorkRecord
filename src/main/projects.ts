@@ -1,12 +1,14 @@
 import { existsSync } from 'node:fs'
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
 import type { ProjectDetail, ProjectFileInfo, ProjectSummary } from '@shared/api'
+import type { ProjectStatus } from '@shared/md/project'
 import {
   DEFAULT_CATEGORIES,
   addCategoryToRaw,
   parseProject,
-  projectTemplate
+  projectTemplate,
+  setStatusInRaw
 } from '@shared/md/project'
 
 const PROJECT_FILE = '_project.md'
@@ -60,7 +62,11 @@ export async function createProject(
 export async function readProject(vaultPath: string, name: string): Promise<ProjectDetail> {
   const dir = projectDirPath(vaultPath, name)
 
-  let meta = { created: '', categories: [...DEFAULT_CATEGORIES] }
+  let meta = {
+    created: '',
+    categories: [...DEFAULT_CATEGORIES],
+    status: 'active' as ProjectStatus
+  }
   let description = ''
   try {
     const doc = parseProject(await readFile(join(dir, PROJECT_FILE), 'utf-8'))
@@ -108,6 +114,7 @@ export async function readProject(vaultPath: string, name: string): Promise<Proj
     name: name.trim(),
     description,
     categories,
+    status: meta.status,
     fileCount: files.length,
     updatedAt,
     files
@@ -183,4 +190,53 @@ export async function importFiles(
     if (resolve(target) === resolve(source)) continue
     await copyFile(source, target)
   }
+}
+
+export async function setProjectStatus(
+  vaultPath: string,
+  name: string,
+  status: ProjectStatus
+): Promise<void> {
+  const dir = projectDirPath(vaultPath, name)
+  const metaPath = join(dir, PROJECT_FILE)
+
+  let raw: string
+  try {
+    raw = await readFile(metaPath, 'utf-8')
+  } catch {
+    raw = projectTemplate(name.trim(), '')
+  }
+
+  await writeFile(metaPath, setStatusInRaw(raw, status), 'utf-8')
+}
+
+export async function renameFile(
+  vaultPath: string,
+  project: string,
+  category: string,
+  name: string,
+  newName: string
+): Promise<void> {
+  const source = projectFilePath(vaultPath, project, category, name)
+  const target = projectFilePath(vaultPath, project, category, newName)
+
+  if (resolve(source) === resolve(target)) return
+  if (existsSync(target)) throw new Error('同名文件已存在')
+  await rename(source, target)
+}
+
+export async function moveFile(
+  vaultPath: string,
+  project: string,
+  category: string,
+  name: string,
+  toCategory: string
+): Promise<void> {
+  const source = projectFilePath(vaultPath, project, category, name)
+  const targetDir = join(projectDirPath(vaultPath, project), assertSegment(toCategory, '分类名'))
+  await mkdir(targetDir, { recursive: true })
+
+  const target = await uniqueTargetPath(targetDir, basename(source))
+  if (resolve(source) === resolve(target)) return
+  await rename(source, target)
 }

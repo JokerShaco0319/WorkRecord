@@ -1,5 +1,6 @@
 import { copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import type { BackupInfo } from '@shared/api'
 
 const KEEP = 7
 
@@ -56,4 +57,39 @@ export async function backupVault(vaultPath: string, today: string): Promise<voi
   }
 
   await prune(root, today)
+}
+
+export async function listBackups(vaultPath: string): Promise<BackupInfo[]> {
+  const root = join(vaultPath, '.workrecord', 'backups')
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
+  const result: BackupInfo[] = []
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/^\d{4}-\d{2}-\d{2}$/.test(entry.name)) continue
+    const files: string[] = []
+    await collectMarkdown(join(root, entry.name), files)
+    result.push({ date: entry.name, files: files.length })
+  }
+
+  return result.sort((a, b) => b.date.localeCompare(a.date))
+}
+
+/** 用指定快照覆盖当前的 Markdown 记录，返回恢复的文件数 */
+export async function restoreBackup(vaultPath: string, date: string): Promise<number> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('非法的备份日期')
+
+  const root = join(vaultPath, '.workrecord', 'backups', date)
+  if (!(await exists(root))) throw new Error('找不到该日期的备份')
+
+  const files: string[] = []
+  await collectMarkdown(root, files)
+
+  for (const file of files) {
+    const rel = file.slice(root.length + 1)
+    const dest = join(vaultPath, rel)
+    await mkdir(dirname(dest), { recursive: true })
+    await copyFile(file, dest)
+  }
+
+  return files.length
 }

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import type {
   AppSettings,
   Asset,
+  BackupInfo,
   CompletedTodo,
   MonthFile,
   ProjectDetail,
@@ -13,6 +14,7 @@ import type {
   WeeklyPreview
 } from '@shared/api'
 import { formatDateKey, formatTimeHm, monthKeyForDate } from '@shared/date'
+import type { ProjectStatus } from '@shared/md/project'
 import type { DayDoc, EntryInput, EntryTarget } from '@shared/md/month'
 import {
   appendEntry,
@@ -41,14 +43,18 @@ import {
   mergeAutoBlock,
   weekRangeFromKey
 } from '@shared/md/weekly'
+import { listBackups, restoreBackup } from './backup'
 import {
   addCategory,
   createProject,
   importFiles,
   listProjects,
+  moveFile,
   projectDirPath,
   projectFilePath,
-  readProject
+  readProject,
+  renameFile,
+  setProjectStatus
 } from './projects'
 import { listAssets, removeAsset, saveAsset } from './assets'
 import { closeCapture, resizeCapture } from './capture'
@@ -445,6 +451,74 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       return readProject(vaultPath, project)
     }
   )
+
+  ipcMain.handle(
+    'projects:set-status',
+    async (_event, name: string, status: ProjectStatus): Promise<ProjectDetail> => {
+      if (status !== 'active' && status !== 'paused' && status !== 'archived') {
+        throw new Error(`非法的项目状态：${status}`)
+      }
+      const vaultPath = await requireVault()
+      await setProjectStatus(vaultPath, name, status)
+      return readProject(vaultPath, name)
+    }
+  )
+
+  ipcMain.handle(
+    'files:rename',
+    async (
+      _event,
+      project: string,
+      category: string,
+      name: string,
+      newName: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await renameFile(vaultPath, project, category, name, newName)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:move',
+    async (
+      _event,
+      project: string,
+      category: string,
+      name: string,
+      toCategory: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await moveFile(vaultPath, project, category, name, toCategory)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle('backups:list', async (): Promise<BackupInfo[]> => {
+    const vaultPath = await requireVault()
+    return listBackups(vaultPath)
+  })
+
+  ipcMain.handle('backups:restore', async (_event, date: string): Promise<number> => {
+    const vaultPath = await requireVault()
+
+    const window = getWindow()
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      buttons: ['恢复', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      title: '恢复备份',
+      message: `用 ${date} 的备份覆盖当前所有 Markdown 记录？`,
+      detail: '当前内容会被快照中的版本替换，无法撤销。项目里的其他文件不受影响。'
+    }
+    const result = window
+      ? await dialog.showMessageBox(window, options)
+      : await dialog.showMessageBox(options)
+
+    if (result.response !== 0) return 0
+    return restoreBackup(vaultPath, date)
+  })
 
   ipcMain.handle('weekly:preview', async (_event, week: string): Promise<WeeklyPreview> => {
     const vaultPath = await requireVault()

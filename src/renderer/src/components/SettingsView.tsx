@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { BackupInfo } from '@shared/api'
 
 interface Props {
   vaultPath: string | null
@@ -21,6 +22,8 @@ const SHORTCUTS: Array<{ keys: string; description: string }> = [
 export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props) {
   const [seconds, setSeconds] = useState(12)
   const [launchAtLogin, setLaunchAtLogin] = useState(false)
+  const [backups, setBackups] = useState<BackupInfo[] | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -31,6 +34,13 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
         setLaunchAtLogin(settings.launchAtLogin)
       })
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    window.api.backups
+      .list()
+      .then(setBackups)
+      .catch(() => setBackups([]))
   }, [])
 
   async function saveSeconds(): Promise<void> {
@@ -47,6 +57,17 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
     try {
       const settings = await window.api.settings.setLaunchAtLogin(enabled)
       setLaunchAtLogin(settings.launchAtLogin)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function restore(date: string): Promise<void> {
+    try {
+      const count = await window.api.backups.restore(date)
+      setNotice(count > 0 ? `已从 ${date} 的备份恢复 ${count} 个文件` : '已取消恢复')
+      setBackups(await window.api.backups.list())
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -166,6 +187,43 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface px-5 py-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[13px] font-medium">备份</h2>
+              <span className="text-[10px] text-muted/60">每天首次启动自动生成，保留 7 天</span>
+            </div>
+
+            {notice && <p className="mt-2 text-[11px] text-accent">{notice}</p>}
+
+            {backups === null ? (
+              <p className="mt-3 text-[12px] text-muted">正在读取…</p>
+            ) : backups.length === 0 ? (
+              <p className="mt-3 text-[12px] text-muted">还没有备份。</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5">
+                {backups.map((item) => (
+                  <li
+                    key={item.date}
+                    className="flex items-center justify-between gap-3 text-[12px]"
+                  >
+                    <span className="text-muted">
+                      {item.date}
+                      <span className="ml-2 text-muted/60">{item.files} 个文件</span>
+                    </span>
+                    <button
+                      type="button"
+                      data-action="backup-restore"
+                      onClick={() => void restore(item.date)}
+                      className="rounded border border-line bg-paper px-2 py-0.5 text-[11px] text-muted transition-colors hover:text-ink"
+                    >
+                      恢复
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="rounded-xl border border-line bg-surface px-5 py-4">

@@ -7,10 +7,12 @@ import trayIcon from '../../resources/tray.png?asset'
 import { backupVault } from './backup'
 import { openCapture } from './capture'
 import { registerIpc } from './ipc'
+import { notifyDueTodos } from './reminders'
 import { migrateCompletedTodos } from './todoArchive'
 import { readAppConfig } from './vault'
 
 app.setName('WorkRecord')
+app.setAppUserModelId('com.workrecord.app')
 
 if (process.env.WORKRECORD_USER_DATA) {
   app.setPath('userData', process.env.WORKRECORD_USER_DATA)
@@ -138,6 +140,7 @@ function createWindow(): void {
       if (fillPayload) {
         const steps = JSON.parse(fillPayload) as Array<{
           click?: string
+          script?: string
           selector?: string
           index?: number
           value?: string
@@ -149,6 +152,8 @@ function createWindow(): void {
             await mainWindow?.webContents.executeJavaScript(
               `document.querySelector(${JSON.stringify(step.click)})?.click()`
             )
+          } else if (step.script) {
+            await mainWindow?.webContents.executeJavaScript(step.script)
           } else if (step.value !== undefined) {
             const selector = step.selector ?? 'input'
             const index = step.index ?? 0
@@ -192,8 +197,18 @@ app.whenReady().then(() => {
       const today = formatDateKey(new Date())
       await migrateCompletedTodos(config.vaultPath, today)
       await backupVault(config.vaultPath, today)
+      await notifyDueTodos(config.vaultPath, today, showMainWindow).catch(() => false)
     })
     .catch(() => {})
+
+  setInterval(() => {
+    void readAppConfig()
+      .then((config) => {
+        if (!config.vaultPath) return
+        return notifyDueTodos(config.vaultPath, formatDateKey(new Date()), showMainWindow)
+      })
+      .catch(() => {})
+  }, 4 * 60 * 60 * 1000)
 
   if (process.env.WORKRECORD_OPEN_CAPTURE) openCapture()
 

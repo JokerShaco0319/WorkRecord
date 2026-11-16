@@ -2,9 +2,14 @@ import { frontmatterEnd } from './section'
 
 export const DEFAULT_CATEGORIES = ['需求', '设计', '开发', '资料', '归档']
 
+export type ProjectStatus = 'active' | 'paused' | 'archived'
+
+const STATUSES: ProjectStatus[] = ['active', 'paused', 'archived']
+
 export interface ProjectMeta {
   created: string
   categories: string[]
+  status: ProjectStatus
 }
 
 export interface ProjectDoc {
@@ -62,19 +67,45 @@ function extractDescription(body: string): string {
 
 export function projectTemplate(name: string, created: string): string {
   const categories = DEFAULT_CATEGORIES.map((category) => `  - ${category}`).join('\n')
-  return `---\ncreated: ${created}\ncategories:\n${categories}\n---\n\n# ${name}\n`
+  return `---\ncreated: ${created}\nstatus: active\ncategories:\n${categories}\n---\n\n# ${name}\n`
 }
 
 export function parseProject(raw: string): ProjectDoc {
   const { data, body } = parseFrontmatter(raw)
   const categories = toList(data.categories)
+  const status =
+    typeof data.status === 'string' && STATUSES.includes(data.status as ProjectStatus)
+      ? (data.status as ProjectStatus)
+      : 'active'
+
   return {
     meta: {
       created: typeof data.created === 'string' ? data.created : '',
-      categories: categories.length > 0 ? categories : [...DEFAULT_CATEGORIES]
+      categories: categories.length > 0 ? categories : [...DEFAULT_CATEGORIES],
+      status
     },
     description: extractDescription(body)
   }
+}
+
+/** 更新项目状态，保留 frontmatter 里的其他字段 */
+export function setStatusInRaw(raw: string, status: ProjectStatus): string {
+  const lines = raw.split('\n')
+  const fmEnd = frontmatterEnd(lines)
+
+  if (fmEnd === 0) {
+    return `---\nstatus: ${status}\n---\n\n${raw}`
+  }
+
+  for (let i = 1; i < fmEnd - 1; i++) {
+    if (/^status:/.test(lines[i])) {
+      lines[i] = `status: ${status}`
+      return lines.join('\n')
+    }
+  }
+
+  lines.splice(1, 0, `status: ${status}`)
+  return lines.join('\n')
 }
 
 /** 往 frontmatter 的分类列表里追加一项，保持文件其余内容不变 */

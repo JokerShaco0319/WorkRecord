@@ -26,6 +26,7 @@ export default function ProjectsView() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [filter, setFilter] = useState<'active' | 'archived' | 'all'>('active')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -41,6 +42,12 @@ export default function ProjectsView() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  const visibleProjects = (projects ?? []).filter((project) => {
+    if (filter === 'all') return true
+    if (filter === 'archived') return project.status === 'archived'
+    return project.status !== 'archived'
+  })
 
   async function create(): Promise<void> {
     const value = name.trim()
@@ -80,18 +87,44 @@ export default function ProjectsView() {
               </div>
               <div className="mt-1 flex items-baseline gap-3">
                 <h1 className="text-[27px] font-semibold tracking-tight">项目</h1>
-                <span className="text-sm text-muted">{projects?.length ?? 0} 个</span>
+                <span className="text-sm text-muted">{visibleProjects.length} 个</span>
               </div>
             </div>
 
-            <button
-              type="button"
-              data-action="project-new"
-              onClick={() => setCreating((open) => !open)}
-              className="h-7 rounded-md bg-accent px-3 text-[11px] font-medium text-white transition hover:brightness-110"
-            >
-              新建项目
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="flex rounded-lg border border-line bg-paper p-0.5">
+                {(
+                  [
+                    ['active', '进行中'],
+                    ['archived', '已归档'],
+                    ['all', '全部']
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    data-action={`projects-filter-${key}`}
+                    onClick={() => setFilter(key)}
+                    className={`rounded-[6px] px-2.5 py-1 text-[11px] transition-colors ${
+                      filter === key
+                        ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0_/_0.06)]'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                data-action="project-new"
+                onClick={() => setCreating((open) => !open)}
+                className="h-7 rounded-md bg-accent px-3 text-[11px] font-medium text-white transition hover:brightness-110"
+              >
+                新建项目
+              </button>
+            </div>
           </div>
 
           {creating && (
@@ -144,9 +177,9 @@ export default function ProjectsView() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
         <div className="mx-auto w-full max-w-[980px]">
-          {projects && projects.length > 0 ? (
+          {projects === null ? null : visibleProjects.length > 0 ? (
             <div className="grid grid-cols-3 gap-4">
-              {projects.map((project) => (
+              {visibleProjects.map((project) => (
                 <button
                   key={project.name}
                   type="button"
@@ -162,6 +195,17 @@ export default function ProjectsView() {
                       {projectInitial(project.name)}
                     </span>
                     <span className="truncate text-[14px] font-medium">{project.name}</span>
+                    {project.status !== 'active' && (
+                      <span
+                        className={`ml-auto shrink-0 rounded px-1.5 py-px text-[10px] ${
+                          project.status === 'archived'
+                            ? 'bg-line/60 text-muted'
+                            : 'bg-accent-soft text-accent'
+                        }`}
+                      >
+                        {project.status === 'archived' ? '已归档' : '暂停'}
+                      </span>
+                    )}
                   </div>
 
                   <p className="mt-3 line-clamp-2 min-h-[32px] text-[12px] leading-4 text-muted">
@@ -180,14 +224,18 @@ export default function ProjectsView() {
                 </button>
               ))}
             </div>
-          ) : projects ? (
+          ) : (
             <div className="mt-16 text-center">
-              <p className="text-sm text-muted">还没有项目</p>
+              <p className="text-sm text-muted">
+                {projects?.length === 0 ? '还没有项目' : '这个筛选下没有项目'}
+              </p>
               <p className="mt-1 text-xs text-muted/70">
-                点右上角「新建项目」，开始整理工作文件
+                {projects?.length === 0
+                  ? '点右上角「新建项目」，开始整理工作文件'
+                  : '切换上方筛选看看其它状态的项目'}
               </p>
             </div>
-          ) : null}
+          )}
         </div>
       </div>
     </div>

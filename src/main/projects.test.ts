@@ -8,8 +8,11 @@ import {
   createProject,
   importFiles,
   listProjects,
+  moveFile,
   projectFilePath,
-  readProject
+  readProject,
+  renameFile,
+  setProjectStatus
 } from './projects'
 
 let vault: string
@@ -168,5 +171,56 @@ describe('路径安全', () => {
     await createProject(vault, '项目A', '2026-11-16')
     expect(() => projectFilePath(vault, '项目A', '../..', 'x.md')).toThrow()
     expect(() => projectFilePath(vault, '项目A', '需求', '../../x.md')).toThrow()
+  })
+})
+
+describe('文件重命名与移动', () => {
+  it('重命名文件', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    const source = join(sourceDir, 'a.md')
+    await writeFile(source, 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', [source])
+
+    await renameFile(vault, '项目A', '需求', 'a.md', 'b.md')
+
+    expect((await readProject(vault, '项目A')).files.map((file) => file.name)).toEqual(['b.md'])
+  })
+
+  it('重命名到已存在的名字会报错', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await writeFile(join(sourceDir, 'b.md'), 'y', 'utf-8')
+    await importFiles(vault, '项目A', '需求', [join(sourceDir, 'a.md'), join(sourceDir, 'b.md')])
+
+    await expect(renameFile(vault, '项目A', '需求', 'a.md', 'b.md')).rejects.toThrow()
+  })
+
+  it('移动到其它分类，重名时自动改名', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', [join(sourceDir, 'a.md')])
+    await importFiles(vault, '项目A', '设计', [join(sourceDir, 'a.md')])
+
+    await moveFile(vault, '项目A', '需求', 'a.md', '设计')
+
+    const files = (await readProject(vault, '项目A')).files
+    expect(files.filter((file) => file.category === '需求')).toHaveLength(0)
+    expect(
+      files
+        .filter((file) => file.category === '设计')
+        .map((file) => file.name)
+        .sort()
+    ).toEqual(['a (1).md', 'a.md'])
+  })
+
+  it('设置项目状态并写入元文件', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await setProjectStatus(vault, '项目A', 'archived')
+
+    expect((await readProject(vault, '项目A')).status).toBe('archived')
+
+    const meta = await readFile(join(vault, 'projects', '项目A', '_project.md'), 'utf-8')
+    expect(meta).toContain('status: archived')
+    expect(meta).toContain('categories:')
   })
 })

@@ -220,3 +220,10 @@ export function toggleTodo(raw: string, target: TodoTarget, today: string): stri
   })
   return lines.join('\n')
 }
+
+/** 已到期或今天到期、且未完成的待办，按截止日排序 */
+export function dueTodos(raw: string, today: string): TodoItem[] {
+  return parseTodo(raw)
+    .items.filter((item) => !item.done && item.due && item.due <= today)
+    .sort((a, b) => (a.due ?? '').localeCompare(b.due ?? ''))
+}

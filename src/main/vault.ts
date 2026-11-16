@@ -9,9 +9,15 @@ export interface AppConfig {
   vaultPath: string | null
   theme: ThemeMode
   secretClearSeconds: number
+  lastReminderDate: string | null
 }
 
-const DEFAULT_CONFIG: AppConfig = { vaultPath: null, theme: 'light', secretClearSeconds: 12 }
+const DEFAULT_CONFIG: AppConfig = {
+  vaultPath: null,
+  theme: 'light',
+  secretClearSeconds: 12,
+  lastReminderDate: null
+}
 const VAULT_FOLDERS = ['daily', 'weekly', 'projects', 'inbox', '.workrecord']
 
 export function appConfigPath(): string {

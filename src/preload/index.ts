@@ -32,6 +32,7 @@ const api: WorkRecordApi = {
     create: (name) => ipcRenderer.invoke('projects:create', name),
     read: (name) => ipcRenderer.invoke('projects:read', name),
     addCategory: (name, category) => ipcRenderer.invoke('projects:add-category', name, category),
+    setStatus: (name, status) => ipcRenderer.invoke('projects:set-status', name, status),
     reveal: (name) => ipcRenderer.invoke('projects:reveal', name)
   },
   weekly: {
@@ -49,7 +50,15 @@ const api: WorkRecordApi = {
     reveal: (project, category, name) =>
       ipcRenderer.invoke('files:reveal', project, category, name),
     trash: (project, category, name) => ipcRenderer.invoke('files:trash', project, category, name),
+    rename: (project, category, name, newName) =>
+      ipcRenderer.invoke('files:rename', project, category, name, newName),
+    move: (project, category, name, toCategory) =>
+      ipcRenderer.invoke('files:move', project, category, name, toCategory),
     pathOf: (file) => webUtils.getPathForFile(file)
+  },
+  backups: {
+    list: () => ipcRenderer.invoke('backups:list'),
+    restore: (date) => ipcRenderer.invoke('backups:restore', date)
   },
   search: {
     query: (text, limit) => ipcRenderer.invoke('search:query', text, limit)

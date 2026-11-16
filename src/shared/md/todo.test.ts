@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addTodo,
+  dueTodos,
   moveTodo,
   parseTodo,
   removeTodo,
@@ -159,5 +160,27 @@ describe('多象限定位', () => {
     raw = toggleTodo(raw, fourth, '2026-11-16')
     const updated = parseTodo(raw).items.find((item) => item.content === '第四象限')!
     expect(updated.done).toBe(true)
+  })
+})
+
+describe('dueTodos', () => {
+  it('只收集未完成且已到期的待办', () => {
+    const raw = [
+      '## 重要且紧急',
+      '- [ ] 今天到期 | due:2026-11-16',
+      '- [ ] 逾期 | due:2026-11-10',
+      '- [ ] 以后 | due:2026-12-01',
+      '- [x] 已完成 | due:2026-11-01',
+      '',
+      '## 重要但不紧急',
+      '- [ ] 无日期'
+    ].join('\n')
+
+    expect(dueTodos(raw, '2026-11-16').map((item) => item.content)).toEqual(['逾期', '今天到期'])
+  })
+
+  it('没有到期事项时返回空数组', () => {
+    const raw = ['## 重要且紧急', '- [ ] 以后 | due:2026-12-01'].join('\n')
+    expect(dueTodos(raw, '2026-11-16')).toEqual([])
   })
 })

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { backupVault } from './backup'
+import { backupVault, listBackups, restoreBackup } from './backup'
 
 let vault: string
 
@@ -80,5 +80,30 @@ describe('backupVault', () => {
     expect(dirs).toHaveLength(7)
     expect(dirs).toContain('2026-11-10')
     expect(dirs).not.toContain('2026-11-01')
+  })
+})
+
+describe('备份列表与恢复', () => {
+  it('按日期倒序列出备份', async () => {
+    await backupVault(vault, '2026-11-15')
+    await backupVault(vault, '2026-11-16')
+
+    const list = await listBackups(vault)
+    expect(list.map((item) => item.date)).toEqual(['2026-11-16', '2026-11-15'])
+    expect(list[0].files).toBeGreaterThan(0)
+  })
+
+  it('恢复会用快照覆盖当前文件', async () => {
+    await backupVault(vault, '2026-11-16')
+    await writeFile(join(vault, 'todo.md'), '# 改过了', 'utf-8')
+
+    const count = await restoreBackup(vault, '2026-11-16')
+
+    expect(count).toBeGreaterThan(0)
+    expect(await readFile(join(vault, 'todo.md'), 'utf-8')).toBe('# 待办清单')
+  })
+
+  it('不存在的备份会报错', async () => {
+    await expect(restoreBackup(vault, '2020-01-01')).rejects.toThrow()
   })
 })
