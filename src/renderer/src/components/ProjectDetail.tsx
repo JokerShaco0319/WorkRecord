@@ -54,6 +54,8 @@ export default function ProjectDetail({ name, onBack }: Props) {
   const [path, setPath] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
+  const [folderRenameValue, setFolderRenameValue] = useState('')
   const confirmTimer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
@@ -151,6 +153,33 @@ export default function ProjectDetail({ name, onBack }: Props) {
       setDetail(await window.api.files.createFolder(name, category, path, value))
       setFolderName('')
       setCreatingFolder(false)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  function startFolderRename(folder: string): void {
+    setRenamingFolder(folder)
+    setFolderRenameValue(baseName(folder))
+  }
+
+  async function submitFolderRename(folder: string): Promise<void> {
+    if (!category) return
+
+    const target = folderRenameValue.trim()
+    setRenamingFolder(null)
+    if (!target || target === baseName(folder)) return
+
+    try {
+      setDetail(await window.api.files.renameFolder(name, category, folder, target))
+
+      // 当前所在目录可能就在被重命名的目录里
+      if (path === folder || path.startsWith(`${folder}/`)) {
+        const parent = parentOf(folder)
+        const rest = path.slice(folder.length)
+        setPath(parent ? `${parent}/${target}${rest}` : `${target}${rest}`)
+      }
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -441,21 +470,58 @@ export default function ProjectDetail({ name, onBack }: Props) {
                       ).length
 
                       return (
-                        <li key={`folder-${folder}`}>
-                          <button
-                            type="button"
-                            data-action="folder-open"
-                            onClick={() => setPath(folder)}
-                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface"
-                          >
-                            <FolderIcon className="h-4 w-4 shrink-0 text-muted/70" />
-                            <span className="min-w-0 flex-1 truncate text-[13px]">
+                        <li
+                          key={`folder-${folder}`}
+                          className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface"
+                        >
+                          <FolderIcon className="h-4 w-4 shrink-0 text-muted/70" />
+
+                          {renamingFolder === folder ? (
+                            <input
+                              autoFocus
+                              value={folderRenameValue}
+                              onChange={(event) => setFolderRenameValue(event.target.value)}
+                              onBlur={() => void submitFolderRename(folder)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                                  event.preventDefault()
+                                  void submitFolderRename(folder)
+                                }
+                                if (event.key === 'Escape') {
+                                  event.preventDefault()
+                                  setRenamingFolder(null)
+                                }
+                              }}
+                              className="min-w-0 flex-1 rounded border border-accent/50 bg-paper px-2 py-0.5 text-[13px] outline-none"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              data-action="folder-open"
+                              onClick={() => setPath(folder)}
+                              className="min-w-0 flex-1 truncate text-left text-[13px]"
+                            >
                               {baseName(folder)}
-                            </span>
-                            <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted/60">
-                              {count} 个文件
-                            </span>
-                          </button>
+                            </button>
+                          )}
+
+                          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted/60">
+                            {count} 个文件
+                          </span>
+
+                          {renamingFolder !== folder && (
+                            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                              <button
+                                type="button"
+                                title="重命名目录"
+                                data-action="folder-rename"
+                                onClick={() => startFolderRename(folder)}
+                                className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                              >
+                                <PencilIcon className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </li>
                       )
                     })}

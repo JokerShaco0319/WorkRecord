@@ -318,6 +318,35 @@ export async function renameFile(
   await rename(source, target)
 }
 
+export async function renameFolder(
+  vaultPath: string,
+  project: string,
+  category: string,
+  folderPath: string,
+  newName: string
+): Promise<void> {
+  const relative = assertRelativePath(folderPath, '路径')
+  if (!relative) throw new Error('缺少目录路径')
+
+  const source = resolveInsideCategory(vaultPath, project, category, relative)
+  const info = await stat(source).catch(() => null)
+  if (!info || !info.isDirectory()) throw new Error('目录不存在')
+
+  const index = relative.lastIndexOf('/')
+  const parent = index >= 0 ? relative.slice(0, index) : ''
+  const folderName = assertSegment(newName, '目录名')
+  const target = resolveInsideCategory(
+    vaultPath,
+    project,
+    category,
+    parent ? `${parent}/${folderName}` : folderName
+  )
+
+  if (resolve(source) === resolve(target)) return
+  if (existsSync(target)) throw new Error('同名目录已存在')
+  await rename(source, target)
+}
+
 export async function moveFile(
   vaultPath: string,
   project: string,

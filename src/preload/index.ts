@@ -52,6 +52,8 @@ const api: WorkRecordApi = {
     trash: (project, category, path) => ipcRenderer.invoke('files:trash', project, category, path),
     rename: (project, category, path, newName) =>
       ipcRenderer.invoke('files:rename', project, category, path, newName),
+    renameFolder: (project, category, path, newName) =>
+      ipcRenderer.invoke('files:rename-folder', project, category, path, newName),
     move: (project, category, path, toCategory) =>
       ipcRenderer.invoke('files:move', project, category, path, toCategory),
     createFolder: (project, category, dir, name) =>

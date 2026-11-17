@@ -13,6 +13,7 @@ import {
   moveFile,
   readProject,
   renameFile,
+  renameFolder,
   resolveInsideCategory,
   setProjectStatus
 } from './projects'
@@ -264,5 +265,38 @@ describe('子目录', () => {
     await createFolder(vault, '项目A', '需求', '', '草图')
 
     await expect(createFolder(vault, '项目A', '需求', '', '草图')).rejects.toThrow()
+  })
+
+  it('重命名目录，内部文件路径随之变化', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '草图', [join(sourceDir, 'a.md')])
+
+    await renameFolder(vault, '项目A', '需求', '草图', '草图2')
+
+    const project = await readProject(vault, '项目A')
+    expect(project.folders.map((folder) => folder.path)).toEqual(['草图2'])
+    expect(project.files[0].path).toBe('草图2/a.md')
+  })
+
+  it('重命名嵌套目录只改最后一级', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await createFolder(vault, '项目A', '需求', '草图', 'v1')
+
+    await renameFolder(vault, '项目A', '需求', '草图/v1', 'v2')
+
+    expect(
+      (await readProject(vault, '项目A')).folders.map((folder) => folder.path).sort()
+    ).toEqual(['草图', '草图/v2'])
+  })
+
+  it('重命名为已存在的目录会报错', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await createFolder(vault, '项目A', '需求', '', '草图2')
+
+    await expect(renameFolder(vault, '项目A', '需求', '草图', '草图2')).rejects.toThrow()
   })
 })

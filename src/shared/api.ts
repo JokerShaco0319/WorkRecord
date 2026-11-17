@@ -175,6 +175,12 @@ export interface WorkRecordApi {
       path: string,
       newName: string
     ): Promise<ProjectDetail>
+    renameFolder(
+      project: string,
+      category: string,
+      path: string,
+      newName: string
+    ): Promise<ProjectDetail>
     move(
       project: string,
       category: string,

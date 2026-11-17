@@ -54,6 +54,7 @@ import {
   projectDirPath,
   readProject,
   renameFile,
+  renameFolder,
   resolveInsideCategory,
   setProjectStatus
 } from './projects'
@@ -484,6 +485,21 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     ): Promise<ProjectDetail> => {
       const vaultPath = await requireVault()
       await renameFile(vaultPath, project, category, path, newName)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:rename-folder',
+    async (
+      _event,
+      project: string,
+      category: string,
+      path: string,
+      newName: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await renameFolder(vaultPath, project, category, path, newName)
       return readProject(vaultPath, project)
     }
   )
