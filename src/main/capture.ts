@@ -5,7 +5,8 @@ import { join } from 'node:path'
 let captureWindow: BrowserWindow | null = null
 
 export function closeCapture(): void {
-  if (captureWindow && !captureWindow.isDestroyed()) captureWindow.close()
+  // 只隐藏不销毁，下次呼出可以立刻显示
+  if (captureWindow && !captureWindow.isDestroyed()) captureWindow.hide()
 }
 
 export function resizeCapture(height: number): void {
@@ -24,6 +25,7 @@ export function openCapture(): void {
   if (captureWindow && !captureWindow.isDestroyed()) {
     captureWindow.show()
     captureWindow.focus()
+    captureWindow.webContents.send('capture:reset')
     return
   }
 
@@ -45,7 +47,7 @@ export function openCapture(): void {
   })
 
   if (!process.env.WORKRECORD_CAPTURE_SHOT) {
-    captureWindow.on('blur', () => captureWindow?.close())
+    captureWindow.on('blur', () => captureWindow?.hide())
   }
   captureWindow.on('closed', () => {
     captureWindow = null
@@ -53,9 +55,9 @@ export function openCapture(): void {
 
   const devUrl = process.env.ELECTRON_RENDERER_URL
   if (devUrl) {
-    void captureWindow.loadURL(`${devUrl}#capture`)
+    void captureWindow.loadURL(`${devUrl}/capture.html`)
   } else {
-    void captureWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'capture' })
+    void captureWindow.loadFile(join(__dirname, '../renderer/capture.html'))
   }
 
   captureWindow.once('ready-to-show', () => {

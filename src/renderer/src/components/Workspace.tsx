@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import type { SearchHit, VaultInfo } from '@shared/api'
 import {
   CalendarIcon,
@@ -15,7 +15,8 @@ import SearchOverlay from './SearchOverlay'
 import SettingsView from './SettingsView'
 import StatsView from './StatsView'
 import TodoView from './TodoView'
-import WeeklyView from './WeeklyView'
+
+const WeeklyView = lazy(() => import('./WeeklyView'))
 
 type View = 'day' | 'todo' | 'projects' | 'weekly' | 'stats' | 'settings'
 
@@ -205,7 +206,9 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
         {view === 'todo' && <TodoView />}
         {view === 'projects' && <ProjectsView />}
         {view === 'weekly' && (
-          <WeeklyView key={weekSeed?.nonce ?? 'week'} initialWeek={weekSeed?.week} />
+          <Suspense fallback={<div className="p-10 text-[12px] text-muted">正在加载周报…</div>}>
+            <WeeklyView key={weekSeed?.nonce ?? 'week'} initialWeek={weekSeed?.week} />
+          </Suspense>
         )}
         {view === 'stats' && <StatsView />}
         {view === 'settings' && (

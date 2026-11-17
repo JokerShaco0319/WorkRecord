@@ -43,21 +43,24 @@ const api: WorkRecordApi = {
     export: (week, text) => ipcRenderer.invoke('weekly:export', week, text)
   },
   files: {
-    import: (project, category) => ipcRenderer.invoke('files:import', project, category),
-    importPaths: (project, category, paths) =>
-      ipcRenderer.invoke('files:import-paths', project, category, paths),
-    open: (project, category, name) => ipcRenderer.invoke('files:open', project, category, name),
-    reveal: (project, category, name) =>
-      ipcRenderer.invoke('files:reveal', project, category, name),
-    trash: (project, category, name) => ipcRenderer.invoke('files:trash', project, category, name),
-    rename: (project, category, name, newName) =>
-      ipcRenderer.invoke('files:rename', project, category, name, newName),
-    move: (project, category, name, toCategory) =>
-      ipcRenderer.invoke('files:move', project, category, name, toCategory),
+    import: (project, category, dir) => ipcRenderer.invoke('files:import', project, category, dir),
+    importPaths: (project, category, dir, paths) =>
+      ipcRenderer.invoke('files:import-paths', project, category, dir, paths),
+    open: (project, category, path) => ipcRenderer.invoke('files:open', project, category, path),
+    reveal: (project, category, path) =>
+      ipcRenderer.invoke('files:reveal', project, category, path),
+    trash: (project, category, path) => ipcRenderer.invoke('files:trash', project, category, path),
+    rename: (project, category, path, newName) =>
+      ipcRenderer.invoke('files:rename', project, category, path, newName),
+    move: (project, category, path, toCategory) =>
+      ipcRenderer.invoke('files:move', project, category, path, toCategory),
+    createFolder: (project, category, dir, name) =>
+      ipcRenderer.invoke('files:create-folder', project, category, dir, name),
     pathOf: (file) => webUtils.getPathForFile(file)
   },
   backups: {
     list: () => ipcRenderer.invoke('backups:list'),
+    create: () => ipcRenderer.invoke('backups:create'),
     restore: (date) => ipcRenderer.invoke('backups:restore', date)
   },
   search: {
@@ -69,7 +72,9 @@ const api: WorkRecordApi = {
     setSecretClearSeconds: (seconds) =>
       ipcRenderer.invoke('settings:set-secret-clear-seconds', seconds),
     setLaunchAtLogin: (enabled) =>
-      ipcRenderer.invoke('settings:set-launch-at-login', enabled)
+      ipcRenderer.invoke('settings:set-launch-at-login', enabled),
+    setBackupReminder: (enabled, time) =>
+      ipcRenderer.invoke('settings:set-backup-reminder', enabled, time)
   },
   clipboard: {
     write: (text) => ipcRenderer.invoke('clipboard:write', text)
@@ -77,7 +82,14 @@ const api: WorkRecordApi = {
   capture: {
     submit: (text) => ipcRenderer.invoke('capture:submit', text),
     close: () => ipcRenderer.invoke('capture:close'),
-    resize: (height) => ipcRenderer.invoke('capture:resize', height)
+    resize: (height) => ipcRenderer.invoke('capture:resize', height),
+    onReset: (listener) => {
+      const handler = (): void => listener()
+      ipcRenderer.on('capture:reset', handler)
+      return () => {
+        ipcRenderer.removeListener('capture:reset', handler)
+      }
+    }
   },
   events: {
     onDataChanged: (listener) => {

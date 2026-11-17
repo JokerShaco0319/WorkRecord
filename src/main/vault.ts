@@ -10,13 +10,19 @@ export interface AppConfig {
   theme: ThemeMode
   secretClearSeconds: number
   lastReminderDate: string | null
+  backupReminderEnabled: boolean
+  backupReminderTime: string
+  lastBackupReminderDate: string | null
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   vaultPath: null,
   theme: 'light',
   secretClearSeconds: 12,
-  lastReminderDate: null
+  lastReminderDate: null,
+  backupReminderEnabled: true,
+  backupReminderTime: '18:00',
+  lastBackupReminderDate: null
 }
 const VAULT_FOLDERS = ['daily', 'weekly', 'projects', 'inbox', '.workrecord']
 

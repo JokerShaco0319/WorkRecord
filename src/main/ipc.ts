@@ -43,17 +43,18 @@ import {
   mergeAutoBlock,
   weekRangeFromKey
 } from '@shared/md/weekly'
-import { listBackups, restoreBackup } from './backup'
+import { createBackup, listBackups, restoreBackup } from './backup'
 import {
   addCategory,
+  createFolder,
   createProject,
   importFiles,
   listProjects,
   moveFile,
   projectDirPath,
-  projectFilePath,
   readProject,
   renameFile,
+  resolveInsideCategory,
   setProjectStatus
 } from './projects'
 import { listAssets, removeAsset, saveAsset } from './assets'
@@ -106,7 +107,9 @@ function currentSettings(config: AppConfig): AppSettings {
   return {
     theme: config.theme,
     secretClearSeconds: config.secretClearSeconds,
-    launchAtLogin: app.getLoginItemSettings().openAtLogin
+    launchAtLogin: app.getLoginItemSettings().openAtLogin,
+    backupReminderEnabled: config.backupReminderEnabled,
+    backupReminderTime: config.backupReminderTime
   }
 }
 
@@ -388,7 +391,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle(
     'files:import',
-    async (_event, project: string, category: string): Promise<ProjectDetail | null> => {
+    async (
+      _event,
+      project: string,
+      category: string,
+      dir: string
+    ): Promise<ProjectDetail | null> => {
       const vaultPath = await requireVault()
       const window = getWindow()
       const options: Electron.OpenDialogOptions = {
@@ -402,7 +410,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
       if (result.canceled || result.filePaths.length === 0) return null
 
-      await importFiles(vaultPath, project, category, result.filePaths)
+      await importFiles(vaultPath, project, category, dir, result.filePaths)
       return readProject(vaultPath, project)
     }
   )
@@ -413,28 +421,29 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       _event,
       project: string,
       category: string,
+      dir: string,
       paths: string[]
     ): Promise<ProjectDetail> => {
       const vaultPath = await requireVault()
-      await importFiles(vaultPath, project, category, paths)
+      await importFiles(vaultPath, project, category, dir, paths)
       return readProject(vaultPath, project)
     }
   )
 
   ipcMain.handle(
     'files:open',
-    async (_event, project: string, category: string, name: string): Promise<void> => {
+    async (_event, project: string, category: string, path: string): Promise<void> => {
       const vaultPath = await requireVault()
-      const error = await shell.openPath(projectFilePath(vaultPath, project, category, name))
+      const error = await shell.openPath(resolveInsideCategory(vaultPath, project, category, path))
       if (error) throw new Error(error)
     }
   )
 
   ipcMain.handle(
     'files:reveal',
-    async (_event, project: string, category: string, name: string): Promise<void> => {
+    async (_event, project: string, category: string, path: string): Promise<void> => {
       const vaultPath = await requireVault()
-      shell.showItemInFolder(projectFilePath(vaultPath, project, category, name))
+      shell.showItemInFolder(resolveInsideCategory(vaultPath, project, category, path))
     }
   )
 
@@ -444,10 +453,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       _event,
       project: string,
       category: string,
-      name: string
+      path: string
     ): Promise<ProjectDetail> => {
       const vaultPath = await requireVault()
-      await shell.trashItem(projectFilePath(vaultPath, project, category, name))
+      await shell.trashItem(resolveInsideCategory(vaultPath, project, category, path))
       return readProject(vaultPath, project)
     }
   )
@@ -470,11 +479,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       _event,
       project: string,
       category: string,
-      name: string,
+      path: string,
       newName: string
     ): Promise<ProjectDetail> => {
       const vaultPath = await requireVault()
-      await renameFile(vaultPath, project, category, name, newName)
+      await renameFile(vaultPath, project, category, path, newName)
       return readProject(vaultPath, project)
     }
   )
@@ -485,11 +494,26 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       _event,
       project: string,
       category: string,
-      name: string,
+      path: string,
       toCategory: string
     ): Promise<ProjectDetail> => {
       const vaultPath = await requireVault()
-      await moveFile(vaultPath, project, category, name, toCategory)
+      await moveFile(vaultPath, project, category, path, toCategory)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:create-folder',
+    async (
+      _event,
+      project: string,
+      category: string,
+      dir: string,
+      name: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await createFolder(vaultPath, project, category, dir, name)
       return readProject(vaultPath, project)
     }
   )
@@ -497,6 +521,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('backups:list', async (): Promise<BackupInfo[]> => {
     const vaultPath = await requireVault()
     return listBackups(vaultPath)
+  })
+
+  ipcMain.handle('backups:create', async (): Promise<number> => {
+    const vaultPath = await requireVault()
+    return createBackup(vaultPath, formatDateKey(new Date()))
   })
 
   ipcMain.handle('backups:restore', async (_event, date: string): Promise<number> => {
@@ -616,6 +645,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     async (_event, enabled: boolean): Promise<AppSettings> => {
       app.setLoginItemSettings({ openAtLogin: Boolean(enabled), args: ['--hidden'] })
       return currentSettings(await readAppConfig())
+    }
+  )
+
+  ipcMain.handle(
+    'settings:set-backup-reminder',
+    async (_event, enabled: boolean, time: string): Promise<AppSettings> => {
+      if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('提醒时间格式应为 HH:mm')
+      return currentSettings(
+        await updateAppConfig({
+          backupReminderEnabled: Boolean(enabled),
+          backupReminderTime: time
+        })
+      )
     }
   )
 

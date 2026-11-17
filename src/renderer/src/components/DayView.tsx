@@ -1,19 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { DailyEntry, DayDoc, EntryInput } from '@shared/md/month'
-import {
-  addDaysKey,
-  formatDateKey,
-  formatTimeHm,
-  monthKeyForDate,
-  parseDateKey,
-  weekdayCn
-} from '@shared/date'
+import { addDaysKey, formatDateKey, formatTimeHm, monthKeyForDate, parseDateKey, weekdayCn } from '@shared/date'
 import CalendarPanel from './CalendarPanel'
 import EntryRow from './EntryRow'
 import SmartInput from './SmartInput'
-import SourceEditor from './SourceEditor'
 import UndoToast from './UndoToast'
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from './icons'
+
+const SourceEditor = lazy(() => import('./SourceEditor'))
 
 type Mode = 'list' | 'source'
 
@@ -349,16 +343,18 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
         </div>
       ) : (
         <div className="min-h-0 flex-1">
-          <SourceEditor
-            sourceKey={month}
-            label={`daily/${month.slice(0, 4)}/${month}.md`}
-            load={async () => (await window.api.daily.readMonth(month)).raw}
-            save={async (raw) => {
-              await window.api.daily.saveMonth(month, raw)
-            }}
-            onSaved={() => setRefreshKey((key) => key + 1)}
-            onError={setError}
-          />
+          <Suspense fallback={<div className="p-6 text-[12px] text-muted">正在加载编辑器…</div>}>
+            <SourceEditor
+              sourceKey={month}
+              label={`daily/${month.slice(0, 4)}/${month}.md`}
+              load={async () => (await window.api.daily.readMonth(month)).raw}
+              save={async (raw) => {
+                await window.api.daily.saveMonth(month, raw)
+              }}
+              onSaved={() => setRefreshKey((key) => key + 1)}
+              onError={setError}
+            />
+          </Suspense>
         </div>
       )}
 

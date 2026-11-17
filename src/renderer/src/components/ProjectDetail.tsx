@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectDetail as ProjectDetailData, ProjectFileInfo } from '@shared/api'
 import type { ProjectStatus } from '@shared/md/project'
 import AssetsPanel from './AssetsPanel'
+import FileTree from './FileTree'
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -30,6 +31,14 @@ function formatModified(iso: string): string {
   return `${month}-${day}`
 }
 
+function parentOf(value: string): string {
+  return value.includes('/') ? value.slice(0, value.lastIndexOf('/')) : ''
+}
+
+function baseName(value: string): string {
+  return value.includes('/') ? value.slice(value.lastIndexOf('/') + 1) : value
+}
+
 export default function ProjectDetail({ name, onBack }: Props) {
   const [detail, setDetail] = useState<ProjectDetailData | null>(null)
   const [category, setCategory] = useState<string | null>(null)
@@ -42,6 +51,9 @@ export default function ProjectDetail({ name, onBack }: Props) {
   const [renamingFile, setRenamingFile] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [movingFile, setMovingFile] = useState<string | null>(null)
+  const [path, setPath] = useState('')
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [folderName, setFolderName] = useState('')
   const confirmTimer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
@@ -85,7 +97,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
   }
 
   function startRename(file: ProjectFileInfo): void {
-    setRenamingFile(`${file.category}/${file.name}`)
+    setRenamingFile(file.path)
     setRenameValue(file.name)
     setMovingFile(null)
   }
@@ -96,7 +108,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
     if (!target || target === file.name) return
 
     try {
-      setDetail(await window.api.files.rename(name, file.category, file.name, target))
+      setDetail(await window.api.files.rename(name, file.category, file.path, target))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -108,7 +120,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
     if (toCategory === file.category) return
 
     try {
-      setDetail(await window.api.files.move(name, file.category, file.name, toCategory))
+      setDetail(await window.api.files.move(name, file.category, file.path, toCategory))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -122,8 +134,23 @@ export default function ProjectDetail({ name, onBack }: Props) {
       const next = await window.api.projects.addCategory(name, value)
       setDetail(next)
       setCategory(value)
+      setPath('')
       setNewCategory('')
       setAdding(false)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function submitFolder(): Promise<void> {
+    const value = folderName.trim()
+    if (!value || !category) return
+
+    try {
+      setDetail(await window.api.files.createFolder(name, category, path, value))
+      setFolderName('')
+      setCreatingFolder(false)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -135,33 +162,45 @@ export default function ProjectDetail({ name, onBack }: Props) {
     setDragOver(false)
     if (mode !== 'files' || !category) return
 
-    const paths: string[] = []
+    const sourcePaths: string[] = []
     for (const file of Array.from(event.dataTransfer.files)) {
       try {
-        const path = window.api.files.pathOf(file)
-        if (path) paths.push(path)
+        const filePath = window.api.files.pathOf(file)
+        if (filePath) sourcePaths.push(filePath)
       } catch {
         // 非本地文件忽略
       }
     }
-    if (paths.length === 0) return
+    if (sourcePaths.length === 0) return
 
-    await run(window.api.files.importPaths(name, category, paths))
+    await run(window.api.files.importPaths(name, category, path, sourcePaths))
   }
 
-  function armConfirm(fileName: string): void {
-    setConfirming(fileName)
+  function armConfirm(key: string): void {
+    setConfirming(key)
     if (confirmTimer.current) window.clearTimeout(confirmTimer.current)
     confirmTimer.current = window.setTimeout(() => setConfirming(null), 3000)
   }
 
   const categories = detail?.categories ?? []
-  const files = detail?.files.filter((file) => file.category === category) ?? []
+  const categoryFiles = detail?.files.filter((file) => file.category === category) ?? []
+  const categoryFolders =
+    detail?.folders.filter((folder) => folder.category === category).map((folder) => folder.path) ??
+    []
+
+  const visibleFolders = categoryFolders.filter((folder) => parentOf(folder) === path)
+  const visibleFiles = categoryFiles.filter((file) => parentOf(file.path) === path)
+  const breadcrumbs = path
+    ? path.split('/').map((label, index, all) => ({
+        name: label,
+        path: all.slice(0, index + 1).join('/')
+      }))
+    : []
 
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-line/60 px-10 pt-8 pb-3">
-        <div className="mx-auto w-full max-w-[980px]">
+        <div className="mx-auto w-full max-w-[1120px]">
           <button
             type="button"
             onClick={onBack}
@@ -220,7 +259,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
               {mode === 'files' && (
                 <button
                   type="button"
-                  onClick={() => category && void run(window.api.files.import(name, category))}
+                  onClick={() => category && void run(window.api.files.import(name, category, path))}
                   disabled={!category}
                   className="h-7 rounded-md bg-accent px-2.5 text-[11px] font-medium text-white transition hover:brightness-110 disabled:opacity-50"
                 >
@@ -238,60 +277,63 @@ export default function ProjectDetail({ name, onBack }: Props) {
           </div>
 
           {mode === 'files' && (
-          <div className="mt-4 flex flex-wrap items-center gap-1">
-            {categories.map((item) => (
-              <button
-                key={item}
-                type="button"
-                data-action={`category-${item}`}
-                onClick={() => setCategory(item)}
-                className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
-                  category === item
-                    ? 'bg-accent-soft font-medium text-accent'
-                    : 'text-muted hover:bg-surface hover:text-ink'
-                }`}
-              >
-                {item}
-                <span className="ml-1.5 text-[10px] tabular-nums opacity-60">
-                  {detail?.files.filter((file) => file.category === item).length ?? 0}
-                </span>
-              </button>
-            ))}
+            <div className="mt-4 flex flex-wrap items-center gap-1">
+              {categories.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  data-action={`category-${item}`}
+                  onClick={() => {
+                    setCategory(item)
+                    setPath('')
+                  }}
+                  className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
+                    category === item
+                      ? 'bg-accent-soft font-medium text-accent'
+                      : 'text-muted hover:bg-surface hover:text-ink'
+                  }`}
+                >
+                  {item}
+                  <span className="ml-1.5 text-[10px] tabular-nums opacity-60">
+                    {detail?.files.filter((file) => file.category === item).length ?? 0}
+                  </span>
+                </button>
+              ))}
 
-            {adding ? (
-              <input
-                autoFocus
-                value={newCategory}
-                onChange={(event) => setNewCategory(event.target.value)}
-                onBlur={() => {
-                  setAdding(false)
-                  setNewCategory('')
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                    event.preventDefault()
-                    void submitCategory()
-                  }
-                  if (event.key === 'Escape') {
-                    event.preventDefault()
+              {adding ? (
+                <input
+                  autoFocus
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  onBlur={() => {
                     setAdding(false)
                     setNewCategory('')
-                  }
-                }}
-                placeholder="分类名称"
-                className="w-24 rounded-md border border-accent/40 bg-surface px-2 py-1 text-[12px] outline-none"
-              />
-            ) : (
-              <button
-                type="button"
-                data-action="project-add-category"
-                onClick={() => setAdding(true)}
-                className="rounded-md px-2 py-1 text-[12px] text-muted/70 transition-colors hover:bg-surface hover:text-ink"
-              >
-                + 新建分类
-              </button>
-            )}
-          </div>
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                      event.preventDefault()
+                      void submitCategory()
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setAdding(false)
+                      setNewCategory('')
+                    }
+                  }}
+                  placeholder="分类名称"
+                  className="w-24 rounded-md border border-accent/40 bg-surface px-2 py-1 text-[12px] outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  data-action="project-add-category"
+                  onClick={() => setAdding(true)}
+                  className="rounded-md px-2 py-1 text-[12px] text-muted/70 transition-colors hover:bg-surface hover:text-ink"
+                >
+                  + 新建分类
+                </button>
+              )}
+            </div>
           )}
 
           {error && (
@@ -312,155 +354,271 @@ export default function ProjectDetail({ name, onBack }: Props) {
           if (!next || !event.currentTarget.contains(next)) setDragOver(false)
         }}
         onDrop={(event) => void handleDrop(event)}
-        className="relative min-h-0 flex-1 overflow-y-auto px-10 py-5"
+        className="relative min-h-0 flex-1 px-10 py-5"
       >
-        <div className="mx-auto w-full max-w-[980px]">
-          {mode === 'assets' ? (
-            <AssetsPanel project={name} />
-          ) : files.length > 0 ? (
-            <ul className="space-y-0.5">
-              {files.map((file: ProjectFileInfo) => {
-                const key = `${file.category}/${file.name}`
-                const isRenaming = renamingFile === key
-                const isMoving = movingFile === key
-
-                return (
-                  <li
-                    key={key}
-                    onDoubleClick={() => {
-                      if (!isRenaming) void window.api.files.open(name, file.category, file.name)
-                    }}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface"
-                    title="双击用系统默认程序打开"
-                  >
-                    <FileIcon className="h-4 w-4 shrink-0 text-muted/70" />
-
-                    {isRenaming ? (
-                      <input
-                        autoFocus
-                        value={renameValue}
-                        onChange={(event) => setRenameValue(event.target.value)}
-                        onBlur={() => void submitRename(file)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                            event.preventDefault()
-                            void submitRename(file)
-                          }
-                          if (event.key === 'Escape') {
-                            event.preventDefault()
-                            setRenamingFile(null)
-                          }
-                        }}
-                        className="min-w-0 flex-1 rounded border border-accent/50 bg-paper px-2 py-0.5 text-[13px] outline-none"
-                      />
-                    ) : (
-                      <span className="min-w-0 flex-1 truncate text-[13px]">{file.name}</span>
-                    )}
-
-                    <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
-                      {formatSize(file.size)}
-                    </span>
-                    <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
-                      {formatModified(file.modified)}
-                    </span>
-
-                    <div
-                      className={`relative flex shrink-0 items-center gap-0.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100 ${
-                        isMoving ? 'opacity-100' : 'opacity-0'
+        <div className="mx-auto flex h-full w-full max-w-[1120px] gap-4">
+          <div className="min-w-0 flex-1 overflow-y-auto pb-4">
+            {mode === 'assets' ? (
+              <AssetsPanel project={name} />
+            ) : (
+              <>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1 text-[12px]">
+                    <button
+                      type="button"
+                      onClick={() => setPath('')}
+                      className={`rounded px-1 py-0.5 transition-colors ${
+                        path ? 'text-muted hover:text-ink' : 'font-medium text-ink'
                       }`}
                     >
-                      <button
-                        type="button"
-                        title="在文件夹中显示"
-                        onClick={() => void window.api.files.reveal(name, file.category, file.name)}
-                        className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
-                      >
-                        <FolderIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="重命名"
-                        data-action="file-rename"
-                        onClick={() => startRename(file)}
-                        className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
-                      >
-                        <PencilIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="移动到其它分类"
-                        data-action="file-move"
-                        onClick={() => setMovingFile(isMoving ? null : key)}
-                        className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
-                      >
-                        <ChevronRightIcon className="h-3.5 w-3.5" />
-                      </button>
-
-                      {confirming === file.name ? (
+                      {category ?? '分类'}
+                    </button>
+                    {breadcrumbs.map((crumb) => (
+                      <span key={crumb.path} className="flex items-center gap-1">
+                        <span className="text-muted/40">/</span>
                         <button
                           type="button"
-                          data-action="file-delete-confirm"
-                          onClick={() =>
-                            void run(window.api.files.trash(name, file.category, file.name))
-                          }
-                          className="rounded px-1.5 py-0.5 text-[11px] text-red-600 transition-colors hover:bg-red-50"
+                          onClick={() => setPath(crumb.path)}
+                          className={`rounded px-1 py-0.5 transition-colors ${
+                            crumb.path === path
+                              ? 'font-medium text-ink'
+                              : 'text-muted hover:text-ink'
+                          }`}
                         >
-                          确认删除
+                          {crumb.name}
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          title="删除到回收站"
-                          data-action="file-delete"
-                          onClick={() => armConfirm(file.name)}
-                          className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-red-50 hover:text-red-600"
-                        >
-                          <TrashIcon className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      </span>
+                    ))}
+                  </div>
 
-                      {isMoving && (
-                        <div className="absolute right-0 top-full z-20 mt-1 w-32 overflow-hidden rounded-lg border border-line bg-surface shadow-[0_8px_24px_rgb(0_0_0_/_0.12)]">
-                          {categories.filter((item) => item !== file.category).length > 0 ? (
-                            categories
-                              .filter((item) => item !== file.category)
-                              .map((item) => (
-                                <button
-                                  key={item}
-                                  type="button"
-                                  data-action="file-move-target"
-                                  onClick={() => void moveTo(file, item)}
-                                  className="block w-full px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-paper"
-                                >
-                                  {item}
-                                </button>
-                              ))
+                  {creatingFolder ? (
+                    <input
+                      autoFocus
+                      value={folderName}
+                      onChange={(event) => setFolderName(event.target.value)}
+                      onBlur={() => {
+                        setCreatingFolder(false)
+                        setFolderName('')
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                          event.preventDefault()
+                          void submitFolder()
+                        }
+                        if (event.key === 'Escape') {
+                          event.preventDefault()
+                          setCreatingFolder(false)
+                          setFolderName('')
+                        }
+                      }}
+                      placeholder="目录名称"
+                      className="h-7 w-32 rounded-md border border-accent/40 bg-surface px-2 text-[12px] outline-none"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      data-action="file-new-folder"
+                      onClick={() => setCreatingFolder(true)}
+                      className="h-7 shrink-0 rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink"
+                    >
+                      + 新建目录
+                    </button>
+                  )}
+                </div>
+
+                {visibleFolders.length === 0 && visibleFiles.length === 0 ? (
+                  <div className="mt-16 text-center">
+                    <p className="text-sm text-muted">这个目录还是空的</p>
+                    <p className="mt-1 text-xs text-muted/70">
+                      新建目录整理文件，或把文件拖到这里
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {visibleFolders.map((folder) => {
+                      const count = categoryFiles.filter((file) =>
+                        file.path.startsWith(`${folder}/`)
+                      ).length
+
+                      return (
+                        <li key={`folder-${folder}`}>
+                          <button
+                            type="button"
+                            data-action="folder-open"
+                            onClick={() => setPath(folder)}
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface"
+                          >
+                            <FolderIcon className="h-4 w-4 shrink-0 text-muted/70" />
+                            <span className="min-w-0 flex-1 truncate text-[13px]">
+                              {baseName(folder)}
+                            </span>
+                            <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted/60">
+                              {count} 个文件
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+
+                    {visibleFiles.map((file) => {
+                      const isRenaming = renamingFile === file.path
+                      const isMoving = movingFile === file.path
+
+                      return (
+                        <li
+                          key={`file-${file.path}`}
+                          onDoubleClick={() => {
+                            if (!isRenaming) {
+                              void window.api.files.open(name, file.category, file.path)
+                            }
+                          }}
+                          className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface"
+                          title="双击用系统默认程序打开"
+                        >
+                          <FileIcon className="h-4 w-4 shrink-0 text-muted/70" />
+
+                          {isRenaming ? (
+                            <input
+                              autoFocus
+                              value={renameValue}
+                              onChange={(event) => setRenameValue(event.target.value)}
+                              onBlur={() => void submitRename(file)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                                  event.preventDefault()
+                                  void submitRename(file)
+                                }
+                                if (event.key === 'Escape') {
+                                  event.preventDefault()
+                                  setRenamingFile(null)
+                                }
+                              }}
+                              className="min-w-0 flex-1 rounded border border-accent/50 bg-paper px-2 py-0.5 text-[13px] outline-none"
+                            />
                           ) : (
-                            <div className="px-3 py-1.5 text-[11px] text-muted/60">
-                              没有其它分类
-                            </div>
+                            <span className="min-w-0 flex-1 truncate text-[13px]">
+                              {file.name}
+                            </span>
                           )}
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : (
-            <div className="mt-16 text-center">
-              <p className="text-sm text-muted">这个分类还没有文件</p>
-              <p className="mt-1 text-xs text-muted/70">
-                点右上角「导入文件」，或把文件拖到这里
-              </p>
-            </div>
+
+                          <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
+                            {formatSize(file.size)}
+                          </span>
+                          <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
+                            {formatModified(file.modified)}
+                          </span>
+
+                          <div
+                            className={`relative flex shrink-0 items-center gap-0.5 transition-opacity group-hover:opacity-100 focus-within:opacity-100 ${
+                              isMoving ? 'opacity-100' : 'opacity-0'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              title="在文件夹中显示"
+                              onClick={() =>
+                                void window.api.files.reveal(name, file.category, file.path)
+                              }
+                              className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                            >
+                              <FolderIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="重命名"
+                              data-action="file-rename"
+                              onClick={() => startRename(file)}
+                              className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="移动到其它分类"
+                              data-action="file-move"
+                              onClick={() => setMovingFile(isMoving ? null : file.path)}
+                              className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                            >
+                              <ChevronRightIcon className="h-3.5 w-3.5" />
+                            </button>
+
+                            {confirming === file.path ? (
+                              <button
+                                type="button"
+                                data-action="file-delete-confirm"
+                                onClick={() =>
+                                  void run(
+                                    window.api.files.trash(name, file.category, file.path)
+                                  )
+                                }
+                                className="rounded px-1.5 py-0.5 text-[11px] text-red-600 transition-colors hover:bg-red-50"
+                              >
+                                确认删除
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                title="删除到回收站"
+                                data-action="file-delete"
+                                onClick={() => armConfirm(file.path)}
+                                className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-red-50 hover:text-red-600"
+                              >
+                                <TrashIcon className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+
+                            {isMoving && (
+                              <div className="absolute right-0 top-full z-20 mt-1 w-32 overflow-hidden rounded-lg border border-line bg-surface shadow-[0_8px_24px_rgb(0_0_0_/_0.12)]">
+                                {categories.filter((item) => item !== file.category).length > 0 ? (
+                                  categories
+                                    .filter((item) => item !== file.category)
+                                    .map((item) => (
+                                      <button
+                                        key={item}
+                                        type="button"
+                                        data-action="file-move-target"
+                                        onClick={() => void moveTo(file, item)}
+                                        className="block w-full px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-paper"
+                                      >
+                                        {item}
+                                      </button>
+                                    ))
+                                ) : (
+                                  <div className="px-3 py-1.5 text-[11px] text-muted/60">
+                                    没有其它分类
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+
+          {mode === 'files' && category && (
+            <aside className="hidden w-[240px] shrink-0 overflow-y-auto rounded-xl border border-line bg-surface px-3 py-3 lg:block">
+              <FileTree
+                folders={categoryFolders}
+                files={categoryFiles}
+                currentPath={path}
+                onSelectFolder={setPath}
+                onOpenFile={(file) =>
+                  void window.api.files.open(name, file.category, file.path)
+                }
+              />
+            </aside>
           )}
         </div>
 
         {dragOver && mode === 'files' && (
           <div className="pointer-events-none absolute inset-3 rounded-xl border-2 border-dashed border-accent/50 bg-accent-soft/40">
             <div className="grid h-full place-items-center text-[13px] font-medium text-accent">
-              松手导入到「{category}」
+              松手导入到「{path ? `${category} / ${path}` : category}」
             </div>
           </div>
         )}

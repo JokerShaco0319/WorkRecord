@@ -34,12 +34,12 @@ async function prune(root: string, current: string): Promise<void> {
   }
 }
 
-/** 每天首次启动时把 Markdown 记录快照到 .workrecord/backups/YYYY-MM-DD */
-export async function backupVault(vaultPath: string, today: string): Promise<void> {
+/** 手动备份：把当前 Markdown 记录快照到 .workrecord/backups/YYYY-MM-DD，覆盖当天已有快照 */
+export async function createBackup(vaultPath: string, today: string): Promise<number> {
   const root = join(vaultPath, '.workrecord', 'backups')
   const target = join(root, today)
-  if (await exists(target)) return
 
+  await rm(target, { recursive: true, force: true })
   await mkdir(target, { recursive: true })
 
   const files: string[] = []
@@ -57,6 +57,7 @@ export async function backupVault(vaultPath: string, today: string): Promise<voi
   }
 
   await prune(root, today)
+  return files.length
 }
 
 export async function listBackups(vaultPath: string): Promise<BackupInfo[]> {

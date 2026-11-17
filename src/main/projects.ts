@@ -1,7 +1,12 @@
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
-import type { ProjectDetail, ProjectFileInfo, ProjectSummary } from '@shared/api'
+import type {
+  ProjectDetail,
+  ProjectFileInfo,
+  ProjectFolderInfo,
+  ProjectSummary
+} from '@shared/api'
 import type { ProjectStatus } from '@shared/md/project'
 import {
   DEFAULT_CATEGORIES,
@@ -13,6 +18,7 @@ import {
 
 const PROJECT_FILE = '_project.md'
 const INVALID_SEGMENT = /[\\/:*?"<>|]/
+const MAX_DEPTH = 8
 
 export function assertSegment(value: string, label: string): string {
   const trimmed = value.trim()
@@ -23,6 +29,16 @@ export function assertSegment(value: string, label: string): string {
   return trimmed
 }
 
+/** 校验「a/b/c」形式的相对路径，返回规范化后的值；空串表示分类根目录 */
+export function assertRelativePath(value: string, label: string): string {
+  const normalized = value.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+  if (!normalized) return ''
+
+  const segments = normalized.split('/')
+  for (const segment of segments) assertSegment(segment, label)
+  return segments.join('/')
+}
+
 export function projectsRoot(vaultPath: string): string {
   return join(vaultPath, 'projects')
 }
@@ -31,17 +47,20 @@ export function projectDirPath(vaultPath: string, project: string): string {
   return join(projectsRoot(vaultPath), assertSegment(project, '项目名'))
 }
 
-export function projectFilePath(
+export function categoryDirPath(vaultPath: string, project: string, category: string): string {
+  return join(projectDirPath(vaultPath, project), assertSegment(category, '分类名'))
+}
+
+/** 把分类内的相对路径解析成绝对路径 */
+export function resolveInsideCategory(
   vaultPath: string,
   project: string,
   category: string,
-  fileName: string
+  relativePath: string
 ): string {
-  return join(
-    projectDirPath(vaultPath, project),
-    assertSegment(category, '分类名'),
-    assertSegment(fileName, '文件名')
-  )
+  const base = categoryDirPath(vaultPath, project, category)
+  const safe = assertRelativePath(relativePath, '路径')
+  return safe ? join(base, ...safe.split('/')) : base
 }
 
 export async function createProject(
@@ -57,6 +76,45 @@ export async function createProject(
     await mkdir(join(dir, category), { recursive: true })
   }
   await writeFile(join(dir, PROJECT_FILE), projectTemplate(name.trim(), created), 'utf-8')
+}
+
+interface WalkedFile {
+  path: string
+  name: string
+  size: number
+  modified: string
+}
+
+async function walkCategory(
+  dir: string,
+  prefix: string,
+  depth: number,
+  files: WalkedFile[],
+  folders: string[]
+): Promise<void> {
+  if (depth > MAX_DEPTH) return
+
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue
+
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) {
+      folders.push(relative)
+      await walkCategory(join(dir, entry.name), relative, depth + 1, files, folders)
+      continue
+    }
+
+    if (!entry.isFile()) continue
+    const info = await stat(join(dir, entry.name)).catch(() => null)
+    if (!info) continue
+    files.push({
+      path: relative,
+      name: entry.name,
+      size: info.size,
+      modified: info.mtime.toISOString()
+    })
+  }
 }
 
 export async function readProject(vaultPath: string, name: string): Promise<ProjectDetail> {
@@ -88,22 +146,25 @@ export async function readProject(vaultPath: string, name: string): Promise<Proj
   }
 
   const files: ProjectFileInfo[] = []
+  const folderInfos: ProjectFolderInfo[] = []
+
   for (const category of categories) {
-    const folderPath = join(dir, category)
-    const items = await readdir(folderPath, { withFileTypes: true }).catch(() => [])
-    for (const item of items) {
-      if (!item.isFile()) continue
-      const info = await stat(join(folderPath, item.name))
-      files.push({
-        category,
-        name: item.name,
-        size: info.size,
-        modified: info.mtime.toISOString()
-      })
+    const walked: WalkedFile[] = []
+    const nested: string[] = []
+    await walkCategory(join(dir, category), '', 0, walked, nested)
+
+    for (const file of walked) {
+      files.push({ category, path: file.path, name: file.name, size: file.size, modified: file.modified })
+    }
+    for (const folder of nested) {
+      folderInfos.push({ category, path: folder })
     }
   }
 
-  files.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
+  files.sort((a, b) => a.category.localeCompare(b.category) || a.path.localeCompare(b.path))
+  folderInfos.sort(
+    (a, b) => a.category.localeCompare(b.category) || a.path.localeCompare(b.path)
+  )
 
   const updatedAt = files.reduce<string | null>(
     (latest, file) => (!latest || file.modified > latest ? file.modified : latest),
@@ -117,7 +178,8 @@ export async function readProject(vaultPath: string, name: string): Promise<Proj
     status: meta.status,
     fileCount: files.length,
     updatedAt,
-    files
+    files,
+    folders: folderInfos
   }
 }
 
@@ -129,7 +191,7 @@ export async function listProjects(vaultPath: string): Promise<ProjectSummary[]>
     if (!entry.isDirectory()) continue
     const detail = await readProject(vaultPath, entry.name).catch(() => null)
     if (!detail) continue
-    const { files: _files, ...summary } = detail
+    const { files: _files, folders: _folders, ...summary } = detail
     projects.push(summary)
   }
 
@@ -177,19 +239,40 @@ export async function importFiles(
   vaultPath: string,
   project: string,
   category: string,
+  dir: string,
   sourcePaths: string[]
 ): Promise<void> {
-  const dir = join(projectDirPath(vaultPath, project), assertSegment(category, '分类名'))
-  await mkdir(dir, { recursive: true })
+  const targetDir = resolveInsideCategory(vaultPath, project, category, dir)
+  await mkdir(targetDir, { recursive: true })
 
   for (const source of sourcePaths) {
     const info = await stat(source).catch(() => null)
     if (!info || !info.isFile()) continue
 
-    const target = await uniqueTargetPath(dir, basename(source))
+    const target = await uniqueTargetPath(targetDir, basename(source))
     if (resolve(target) === resolve(source)) continue
     await copyFile(source, target)
   }
+}
+
+export async function createFolder(
+  vaultPath: string,
+  project: string,
+  category: string,
+  dir: string,
+  name: string
+): Promise<void> {
+  const parent = assertRelativePath(dir, '路径')
+  const folderName = assertSegment(name, '目录名')
+  const target = resolveInsideCategory(
+    vaultPath,
+    project,
+    category,
+    parent ? `${parent}/${folderName}` : folderName
+  )
+
+  if (existsSync(target)) throw new Error('同名目录已存在')
+  await mkdir(target, { recursive: true })
 }
 
 export async function setProjectStatus(
@@ -214,11 +297,21 @@ export async function renameFile(
   vaultPath: string,
   project: string,
   category: string,
-  name: string,
+  filePath: string,
   newName: string
 ): Promise<void> {
-  const source = projectFilePath(vaultPath, project, category, name)
-  const target = projectFilePath(vaultPath, project, category, newName)
+  const source = resolveInsideCategory(vaultPath, project, category, filePath)
+  const relative = assertRelativePath(filePath, '路径')
+  if (!relative) throw new Error('缺少文件路径')
+
+  const dirPart = relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/')) : ''
+  const targetName = assertSegment(newName, '文件名')
+  const target = resolveInsideCategory(
+    vaultPath,
+    project,
+    category,
+    dirPart ? `${dirPart}/${targetName}` : targetName
+  )
 
   if (resolve(source) === resolve(target)) return
   if (existsSync(target)) throw new Error('同名文件已存在')
@@ -229,14 +322,14 @@ export async function moveFile(
   vaultPath: string,
   project: string,
   category: string,
-  name: string,
+  filePath: string,
   toCategory: string
 ): Promise<void> {
-  const source = projectFilePath(vaultPath, project, category, name)
-  const targetDir = join(projectDirPath(vaultPath, project), assertSegment(toCategory, '分类名'))
+  const source = resolveInsideCategory(vaultPath, project, category, filePath)
+  const targetDir = categoryDirPath(vaultPath, project, toCategory)
   await mkdir(targetDir, { recursive: true })
 
   const target = await uniqueTargetPath(targetDir, basename(source))
-  if (resolve(source) === resolve(target)) return
+  if (resolve(target) === resolve(source)) return
   await rename(source, target)
 }

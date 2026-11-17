@@ -22,6 +22,8 @@ const SHORTCUTS: Array<{ keys: string; description: string }> = [
 export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props) {
   const [seconds, setSeconds] = useState(12)
   const [launchAtLogin, setLaunchAtLogin] = useState(false)
+  const [reminderEnabled, setReminderEnabled] = useState(true)
+  const [reminderTime, setReminderTime] = useState('18:00')
   const [backups, setBackups] = useState<BackupInfo[] | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -32,6 +34,8 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
       .then((settings) => {
         setSeconds(settings.secretClearSeconds)
         setLaunchAtLogin(settings.launchAtLogin)
+        setReminderEnabled(settings.backupReminderEnabled)
+        setReminderTime(settings.backupReminderTime)
       })
       .catch(() => {})
   }, [])
@@ -68,6 +72,28 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
       const count = await window.api.backups.restore(date)
       setNotice(count > 0 ? `已从 ${date} 的备份恢复 ${count} 个文件` : '已取消恢复')
       setBackups(await window.api.backups.list())
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function createBackup(): Promise<void> {
+    try {
+      const count = await window.api.backups.create()
+      setNotice(`已备份 ${count} 个文件`)
+      setBackups(await window.api.backups.list())
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function saveReminder(enabled: boolean, time: string): Promise<void> {
+    try {
+      const settings = await window.api.settings.setBackupReminder(enabled, time)
+      setReminderEnabled(settings.backupReminderEnabled)
+      setReminderTime(settings.backupReminderTime)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -192,7 +218,40 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
           <section className="rounded-xl border border-line bg-surface px-5 py-4">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-[13px] font-medium">备份</h2>
-              <span className="text-[10px] text-muted/60">每天首次启动自动生成，保留 7 天</span>
+              <span className="text-[10px] text-muted/60">保留最近 7 份</span>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-[12px] text-muted">
+                手动生成一份当前 Markdown 记录的快照
+              </span>
+              <button
+                type="button"
+                data-action="backup-create"
+                onClick={() => void createBackup()}
+                className="h-7 shrink-0 rounded-md bg-accent px-2.5 text-[11px] font-medium text-white transition hover:brightness-110"
+              >
+                立即备份
+              </button>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-muted">
+                <input
+                  type="checkbox"
+                  checked={reminderEnabled}
+                  onChange={(event) => void saveReminder(event.target.checked, reminderTime)}
+                  className="h-3 w-3 accent-[var(--color-accent)]"
+                />
+                每天提醒我备份
+              </label>
+              <input
+                type="time"
+                value={reminderTime}
+                onChange={(event) => setReminderTime(event.target.value)}
+                onBlur={() => void saveReminder(reminderEnabled, reminderTime)}
+                className="h-7 rounded border border-line bg-paper px-2 text-[12px] outline-none focus:border-accent/50"
+              />
             </div>
 
             {notice && <p className="mt-2 text-[11px] text-accent">{notice}</p>}

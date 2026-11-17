@@ -27,6 +27,15 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    build: {
+      minify: true,
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          capture: resolve('src/renderer/capture.html')
+        }
+      }
+    }
   }
 })

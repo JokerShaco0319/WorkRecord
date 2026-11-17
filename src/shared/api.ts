@@ -14,9 +14,17 @@ export interface MonthFile {
 
 export interface ProjectFileInfo {
   category: string
+  /** 相对分类目录的路径，使用 / 分隔，例如「草图/a.png」 */
+  path: string
   name: string
   size: number
   modified: string
+}
+
+export interface ProjectFolderInfo {
+  category: string
+  /** 相对分类目录的路径，例如「草图」 */
+  path: string
 }
 
 export interface ProjectSummary {
@@ -35,6 +43,7 @@ export interface BackupInfo {
 
 export interface ProjectDetail extends ProjectSummary {
   files: ProjectFileInfo[]
+  folders: ProjectFolderInfo[]
 }
 
 export interface WeeklyPreview {
@@ -57,6 +66,8 @@ export interface AppSettings {
   theme: 'light' | 'dark'
   secretClearSeconds: number
   launchAtLogin: boolean
+  backupReminderEnabled: boolean
+  backupReminderTime: string
 }
 
 export interface AssetField {
@@ -148,27 +159,39 @@ export interface WorkRecordApi {
     export(week: string, text: string): Promise<boolean>
   }
   files: {
-    import(project: string, category: string): Promise<ProjectDetail | null>
-    importPaths(project: string, category: string, paths: string[]): Promise<ProjectDetail>
-    open(project: string, category: string, name: string): Promise<void>
-    reveal(project: string, category: string, name: string): Promise<void>
-    trash(project: string, category: string, name: string): Promise<ProjectDetail>
+    import(project: string, category: string, dir: string): Promise<ProjectDetail | null>
+    importPaths(
+      project: string,
+      category: string,
+      dir: string,
+      paths: string[]
+    ): Promise<ProjectDetail>
+    open(project: string, category: string, path: string): Promise<void>
+    reveal(project: string, category: string, path: string): Promise<void>
+    trash(project: string, category: string, path: string): Promise<ProjectDetail>
     rename(
       project: string,
       category: string,
-      name: string,
+      path: string,
       newName: string
     ): Promise<ProjectDetail>
     move(
       project: string,
       category: string,
-      name: string,
+      path: string,
       toCategory: string
+    ): Promise<ProjectDetail>
+    createFolder(
+      project: string,
+      category: string,
+      dir: string,
+      name: string
     ): Promise<ProjectDetail>
     pathOf(file: File): string
   }
   backups: {
     list(): Promise<BackupInfo[]>
+    create(): Promise<number>
     restore(date: string): Promise<number>
   }
   search: {
@@ -179,6 +202,7 @@ export interface WorkRecordApi {
     setTheme(theme: 'light' | 'dark'): Promise<AppSettings>
     setSecretClearSeconds(seconds: number): Promise<AppSettings>
     setLaunchAtLogin(enabled: boolean): Promise<AppSettings>
+    setBackupReminder(enabled: boolean, time: string): Promise<AppSettings>
   }
   clipboard: {
     write(text: string): Promise<void>
@@ -187,6 +211,7 @@ export interface WorkRecordApi {
     submit(text: string): Promise<void>
     close(): Promise<void>
     resize(height: number): Promise<void>
+    onReset(listener: () => void): () => void
   }
   events: {
     onDataChanged(listener: () => void): () => void

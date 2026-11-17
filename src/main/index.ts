@@ -4,10 +4,9 @@ import { join } from 'node:path'
 import { formatDateKey } from '@shared/date'
 import windowIcon from '../../resources/icon.png?asset'
 import trayIcon from '../../resources/tray.png?asset'
-import { backupVault } from './backup'
 import { openCapture } from './capture'
 import { registerIpc } from './ipc'
-import { notifyDueTodos } from './reminders'
+import { notifyBackupReminder, notifyDueTodos } from './reminders'
 import { migrateCompletedTodos } from './todoArchive'
 import { readAppConfig } from './vault'
 
@@ -27,6 +26,7 @@ if (!isPrimaryInstance) {
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let isQuitting = false
+let windowTheme: 'light' | 'dark' = 'light'
 
 function showMainWindow(): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -60,15 +60,17 @@ function createTray(): void {
 }
 
 function createWindow(): void {
+  const startHidden = process.argv.includes('--hidden')
+
   mainWindow = new BrowserWindow({
     width: 1240,
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    show: false,
+    show: !startHidden,
     title: 'WorkRecord',
     icon: windowIcon,
-    backgroundColor: '#f7f6f3',
+    backgroundColor: windowTheme === 'dark' ? '#1b1a18' : '#f7f6f3',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -76,11 +78,6 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: true
     }
-  })
-
-  const startHidden = process.argv.includes('--hidden')
-  mainWindow.once('ready-to-show', () => {
-    if (!startHidden) mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -186,20 +183,23 @@ app.whenReady().then(() => {
   if (!isPrimaryInstance) return
 
   registerIpc(() => mainWindow)
-  createWindow()
   createTray()
 
   globalShortcut.register('CommandOrControl+Shift+Space', () => openCapture())
 
   void readAppConfig()
     .then(async (config) => {
+      windowTheme = config.theme
+      createWindow()
+
       if (!config.vaultPath) return
       const today = formatDateKey(new Date())
       await migrateCompletedTodos(config.vaultPath, today)
-      await backupVault(config.vaultPath, today)
       await notifyDueTodos(config.vaultPath, today, showMainWindow).catch(() => false)
     })
-    .catch(() => {})
+    .catch(() => {
+      createWindow()
+    })
 
   setInterval(() => {
     void readAppConfig()
@@ -209,6 +209,18 @@ app.whenReady().then(() => {
       })
       .catch(() => {})
   }, 4 * 60 * 60 * 1000)
+
+  const checkBackupReminder = (): void => {
+    void readAppConfig()
+      .then((config) => {
+        if (!config.vaultPath) return
+        return notifyBackupReminder(config.vaultPath, new Date(), showMainWindow)
+      })
+      .catch(() => {})
+  }
+
+  checkBackupReminder()
+  setInterval(checkBackupReminder, 60 * 1000)
 
   if (process.env.WORKRECORD_OPEN_CAPTURE) openCapture()
 

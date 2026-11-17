@@ -26,6 +26,15 @@ export default function CaptureView() {
     }
   }, [])
 
+  useEffect(() => {
+    return window.api.capture.onReset(() => {
+      setText('')
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>('[data-action="smart-input"]')?.focus()
+      })
+    })
+  }, [])
+
   async function submit(): Promise<void> {
     const value = text.trim()
     if (!value || busy) return

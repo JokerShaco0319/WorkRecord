@@ -4,14 +4,16 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   addCategory,
+  assertRelativePath,
   assertSegment,
+  createFolder,
   createProject,
   importFiles,
   listProjects,
   moveFile,
-  projectFilePath,
   readProject,
   renameFile,
+  resolveInsideCategory,
   setProjectStatus
 } from './projects'
 
@@ -100,7 +102,7 @@ describe('importFiles', () => {
     const source = join(sourceDir, '需求说明.md')
     await writeFile(source, '# 需求', 'utf-8')
 
-    await importFiles(vault, '项目A', '需求', [source])
+    await importFiles(vault, '项目A', '需求', '', [source])
 
     const project = await readProject(vault, '项目A')
     expect(project.files).toHaveLength(1)
@@ -113,8 +115,8 @@ describe('importFiles', () => {
     const source = join(sourceDir, '设计稿.png')
     await writeFile(source, 'image', 'utf-8')
 
-    await importFiles(vault, '项目A', '设计', [source])
-    await importFiles(vault, '项目A', '设计', [source])
+    await importFiles(vault, '项目A', '设计', '', [source])
+    await importFiles(vault, '项目A', '设计', '', [source])
 
     const names = (await readProject(vault, '项目A')).files.map((file) => file.name).sort()
     expect(names).toEqual(['设计稿 (1).png', '设计稿.png'])
@@ -125,7 +127,7 @@ describe('importFiles', () => {
     const source = join(sourceDir, 'a.txt')
     await writeFile(source, 'x', 'utf-8')
 
-    await importFiles(vault, '项目A', '临时', [source])
+    await importFiles(vault, '项目A', '临时', '', [source])
 
     const project = await readProject(vault, '项目A')
     expect(project.categories).toContain('临时')
@@ -137,7 +139,7 @@ describe('importFiles', () => {
     const folder = join(sourceDir, '文件夹')
     await mkdir(folder)
 
-    await importFiles(vault, '项目A', '资料', [folder, join(sourceDir, '不存在.txt')])
+    await importFiles(vault, '项目A', '资料', '', [folder, join(sourceDir, '不存在.txt')])
     expect((await readProject(vault, '项目A')).fileCount).toBe(0)
   })
 })
@@ -149,7 +151,7 @@ describe('listProjects', () => {
 
     const source = join(sourceDir, 'b.md')
     await writeFile(source, 'x', 'utf-8')
-    await importFiles(vault, '项目B', '需求', [source])
+    await importFiles(vault, '项目B', '需求', '', [source])
 
     const projects = await listProjects(vault)
     expect(projects.map((project) => project.name)).toEqual(['项目B', '项目A'])
@@ -169,8 +171,10 @@ describe('路径安全', () => {
 
   it('拼出的文件路径不会逃出项目目录', async () => {
     await createProject(vault, '项目A', '2026-11-16')
-    expect(() => projectFilePath(vault, '项目A', '../..', 'x.md')).toThrow()
-    expect(() => projectFilePath(vault, '项目A', '需求', '../../x.md')).toThrow()
+    expect(() => resolveInsideCategory(vault, '项目A', '../..', 'x.md')).toThrow()
+    expect(() => resolveInsideCategory(vault, '项目A', '需求', '../../x.md')).toThrow()
+    expect(assertRelativePath('a/b', '路径')).toBe('a/b')
+    expect(() => assertRelativePath('a/../b', '路径')).toThrow()
   })
 })
 
@@ -179,7 +183,7 @@ describe('文件重命名与移动', () => {
     await createProject(vault, '项目A', '2026-11-16')
     const source = join(sourceDir, 'a.md')
     await writeFile(source, 'x', 'utf-8')
-    await importFiles(vault, '项目A', '需求', [source])
+    await importFiles(vault, '项目A', '需求', '', [source])
 
     await renameFile(vault, '项目A', '需求', 'a.md', 'b.md')
 
@@ -190,7 +194,7 @@ describe('文件重命名与移动', () => {
     await createProject(vault, '项目A', '2026-11-16')
     await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
     await writeFile(join(sourceDir, 'b.md'), 'y', 'utf-8')
-    await importFiles(vault, '项目A', '需求', [join(sourceDir, 'a.md'), join(sourceDir, 'b.md')])
+    await importFiles(vault, '项目A', '需求', '', [join(sourceDir, 'a.md'), join(sourceDir, 'b.md')])
 
     await expect(renameFile(vault, '项目A', '需求', 'a.md', 'b.md')).rejects.toThrow()
   })
@@ -198,8 +202,8 @@ describe('文件重命名与移动', () => {
   it('移动到其它分类，重名时自动改名', async () => {
     await createProject(vault, '项目A', '2026-11-16')
     await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
-    await importFiles(vault, '项目A', '需求', [join(sourceDir, 'a.md')])
-    await importFiles(vault, '项目A', '设计', [join(sourceDir, 'a.md')])
+    await importFiles(vault, '项目A', '需求', '', [join(sourceDir, 'a.md')])
+    await importFiles(vault, '项目A', '设计', '', [join(sourceDir, 'a.md')])
 
     await moveFile(vault, '项目A', '需求', 'a.md', '设计')
 
@@ -222,5 +226,43 @@ describe('文件重命名与移动', () => {
     const meta = await readFile(join(vault, 'projects', '项目A', '_project.md'), 'utf-8')
     expect(meta).toContain('status: archived')
     expect(meta).toContain('categories:')
+  })
+})
+
+describe('子目录', () => {
+  it('创建嵌套目录并按层级读取', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await createFolder(vault, '项目A', '需求', '草图', 'v1')
+
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '草图/v1', [join(sourceDir, 'a.md')])
+
+    const project = await readProject(vault, '项目A')
+    expect(project.folders.map((folder) => folder.path)).toEqual(['草图', '草图/v1'])
+    expect(project.files[0]).toMatchObject({
+      category: '需求',
+      path: '草图/v1/a.md',
+      name: 'a.md'
+    })
+    expect(project.fileCount).toBe(1)
+  })
+
+  it('重命名子目录中的文件只改文件名', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '草图', [join(sourceDir, 'a.md')])
+
+    await renameFile(vault, '项目A', '需求', '草图/a.md', 'b.md')
+
+    expect((await readProject(vault, '项目A')).files[0].path).toBe('草图/b.md')
+  })
+
+  it('同名目录会报错', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+
+    await expect(createFolder(vault, '项目A', '需求', '', '草图')).rejects.toThrow()
   })
 })

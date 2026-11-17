@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { backupVault, listBackups, restoreBackup } from './backup'
+import { createBackup, listBackups, restoreBackup } from './backup'
 
 let vault: string
 
@@ -27,9 +27,9 @@ afterEach(async () => {
   await rm(vault, { recursive: true, force: true })
 })
 
-describe('backupVault', () => {
+describe('createBackup', () => {
   it('把 Markdown 记录快照到当天目录', async () => {
-    await backupVault(vault, '2026-11-16')
+    await createBackup(vault, '2026-11-16')
     const target = join(vault, '.workrecord', 'backups', '2026-11-16')
 
     expect(await readFile(join(target, 'todo.md'), 'utf-8')).toContain('待办清单')
@@ -45,7 +45,7 @@ describe('backupVault', () => {
   })
 
   it('不备份非 Markdown 文件', async () => {
-    await backupVault(vault, '2026-11-16')
+    await createBackup(vault, '2026-11-16')
     const target = join(vault, '.workrecord', 'backups', '2026-11-16')
     const names = await readdir(join(target, 'projects', '项目A', '需求'))
 
@@ -53,16 +53,16 @@ describe('backupVault', () => {
     expect(names).not.toContain('附件.txt')
   })
 
-  it('同一天重复运行不改动已有快照', async () => {
-    await backupVault(vault, '2026-11-16')
+  it('重复备份会覆盖当天快照', async () => {
+    await createBackup(vault, '2026-11-16')
     await writeFile(join(vault, 'todo.md'), '# 待办清单（已修改）', 'utf-8')
-    await backupVault(vault, '2026-11-16')
+    await createBackup(vault, '2026-11-16')
 
     const snapshot = await readFile(
       join(vault, '.workrecord', 'backups', '2026-11-16', 'todo.md'),
       'utf-8'
     )
-    expect(snapshot).toBe('# 待办清单')
+    expect(snapshot).toBe('# 待办清单（已修改）')
   })
 
   it('只保留最近 7 份快照', async () => {
@@ -71,7 +71,7 @@ describe('backupVault', () => {
       await mkdir(join(root, `2026-11-0${day}`), { recursive: true })
     }
 
-    await backupVault(vault, '2026-11-10')
+    await createBackup(vault, '2026-11-10')
 
     const dirs = (await readdir(root, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
@@ -85,8 +85,8 @@ describe('backupVault', () => {
 
 describe('备份列表与恢复', () => {
   it('按日期倒序列出备份', async () => {
-    await backupVault(vault, '2026-11-15')
-    await backupVault(vault, '2026-11-16')
+    await createBackup(vault, '2026-11-15')
+    await createBackup(vault, '2026-11-16')
 
     const list = await listBackups(vault)
     expect(list.map((item) => item.date)).toEqual(['2026-11-16', '2026-11-15'])
@@ -94,7 +94,7 @@ describe('备份列表与恢复', () => {
   })
 
   it('恢复会用快照覆盖当前文件', async () => {
-    await backupVault(vault, '2026-11-16')
+    await createBackup(vault, '2026-11-16')
     await writeFile(join(vault, 'todo.md'), '# 改过了', 'utf-8')
 
     const count = await restoreBackup(vault, '2026-11-16')

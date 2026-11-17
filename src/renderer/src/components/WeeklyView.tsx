@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { stripFrontmatter } from '@shared/md/section'
 import type { WeeklyPreview } from '@shared/api'
 import { addDaysKey, formatDateKey, formatMonthDay } from '@shared/date'
 import { isoWeekKey, weekRangeFromKey } from '@shared/md/weekly'
 import MarkdownPreview from './MarkdownPreview'
-import SourceEditor from './SourceEditor'
 import { ChevronLeftIcon, ChevronRightIcon } from './icons'
+
+const SourceEditor = lazy(() => import('./SourceEditor'))
 
 /** 导出/复制时去掉 frontmatter 与自动区块标记 */
 function reportText(raw: string): string {
@@ -202,16 +203,18 @@ export default function WeeklyView({ initialWeek }: { initialWeek?: string }) {
 
       {mode === 'source' && fileRaw ? (
         <div className="min-h-0 flex-1">
-          <SourceEditor
-            sourceKey={week}
-            label={`weekly/${week.slice(0, 4)}/${week}.md`}
-            load={async () => (await window.api.weekly.read(week)) ?? ''}
-            save={async (raw) => {
-              await window.api.weekly.save(week, raw)
-            }}
-            onSaved={() => void refreshFile()}
-            onError={setError}
-          />
+          <Suspense fallback={<div className="p-6 text-[12px] text-muted">正在加载编辑器…</div>}>
+            <SourceEditor
+              sourceKey={week}
+              label={`weekly/${week.slice(0, 4)}/${week}.md`}
+              load={async () => (await window.api.weekly.read(week)) ?? ''}
+              save={async (raw) => {
+                await window.api.weekly.save(week, raw)
+              }}
+              onSaved={() => void refreshFile()}
+              onError={setError}
+            />
+          </Suspense>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
