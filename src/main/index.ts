@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, Tray, globalShortcut, nativeImage, shell } from 'electron'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { formatDateKey } from '@shared/date'
 import windowIcon from '../../resources/icon.png?asset'
 import trayIcon from '../../resources/tray.png?asset'
@@ -13,8 +14,37 @@ import { readAppConfig } from './vault'
 app.setName('WorkRecord')
 app.setAppUserModelId('com.workrecord.app')
 
-if (process.env.WORKRECORD_USER_DATA) {
-  app.setPath('userData', process.env.WORKRECORD_USER_DATA)
+/**
+ * 应用自身产生的数据（配置、缓存）统一放在可执行文件旁的 data 目录：
+ * 安装版 → <安装目录>/data，免安装版 → exe 所在目录/data。
+ * 开发态沿用系统默认位置；自动化测试可用 WORKRECORD_USER_DATA 覆盖。
+ */
+function resolveDataDir(): string | null {
+  if (process.env.WORKRECORD_USER_DATA) return process.env.WORKRECORD_USER_DATA
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return join(process.env.PORTABLE_EXECUTABLE_DIR, 'data')
+  }
+  if (app.isPackaged) return join(dirname(app.getPath('exe')), 'data')
+  return null
+}
+
+const legacyUserData = app.getPath('userData')
+const dataDir = resolveDataDir()
+
+if (dataDir) {
+  try {
+    mkdirSync(dataDir, { recursive: true })
+    app.setPath('userData', dataDir)
+
+    // 老版本配置在 %APPDATA% 下，首次启动搬到新位置，避免丢失数据目录选择
+    const legacyConfig = join(legacyUserData, 'config.json')
+    const dataConfig = join(dataDir, 'config.json')
+    if (!existsSync(dataConfig) && existsSync(legacyConfig)) {
+      copyFileSync(legacyConfig, dataConfig)
+    }
+  } catch (err) {
+    console.error('无法在应用目录写入数据，回退到系统默认位置：', err)
+  }
 }
 
 // 只允许一个实例：重复启动时把已有窗口唤到前台
