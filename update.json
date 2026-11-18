@@ -4,7 +4,7 @@
   "notes": "### 新增\n- **检查更新**：启动后自动检查 GitHub / Gitee 上的新版本，发现更新时弹窗说明更新内容\n- **更新说明弹窗**：升级到新版本后首次启动，会展示本次更新内容\n- **手动检查**：设置页可随时检查更新，并切换更新源\n- **安装包命名固定**：`WorkRecord-Setup-版本号.exe`，下载链接可长期复用\n\n### 说明\n- 检查更新只读取公开的版本清单，不会上传任何本地数据\n- 更新由你手动下载安装，不会静默替换程序",
   "downloads": {
     "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.0/WorkRecord-Setup-0.2.0.exe",
-    "gitee": "https://gitee.com/jokershaco/WorkRecord/releases/download/v0.2.0/WorkRecord-Setup-0.2.0.exe",
+    "gitee": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.0/WorkRecord-Setup-0.2.0.exe",
     "default": "https://github.com/JokerShaco0319/WorkRecord/releases/latest"
   }
 }
