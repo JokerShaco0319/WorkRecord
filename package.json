@@ -24,6 +24,7 @@
       "output": "release"
     },
     "compression": "maximum",
+    "afterPack": "scripts/after-pack.cjs",
     "electronLanguages": [
       "zh-CN",
       "en-US"
