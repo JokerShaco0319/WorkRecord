@@ -133,7 +133,8 @@ function createWindow(): void {
   if (capturePath) {
     mainWindow.webContents.once('did-finish-load', async () => {
       mainWindow?.show()
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const captureDelay = Number(process.env.WORKRECORD_CAPTURE_DELAY ?? 1500)
+      await new Promise((resolve) => setTimeout(resolve, Number.isFinite(captureDelay) ? captureDelay : 1500))
 
       const clickSelectors = process.env.WORKRECORD_CAPTURE_CLICK?.split('|') ?? []
       for (const selector of clickSelectors) {

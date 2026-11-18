@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { BackupInfo } from '@shared/api'
+import type { UpdateSource } from '@shared/update'
+import { useUpdater } from './UpdateProvider'
 
 interface Props {
   vaultPath: string | null
@@ -20,10 +22,13 @@ const SHORTCUTS: Array<{ keys: string; description: string }> = [
 ]
 
 export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props) {
+  const updater = useUpdater()
   const [seconds, setSeconds] = useState(12)
   const [launchAtLogin, setLaunchAtLogin] = useState(false)
   const [reminderEnabled, setReminderEnabled] = useState(true)
   const [reminderTime, setReminderTime] = useState('18:00')
+  const [updateEnabled, setUpdateEnabled] = useState(true)
+  const [updateSource, setUpdateSource] = useState<UpdateSource>('auto')
   const [backups, setBackups] = useState<BackupInfo[] | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +41,8 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
         setLaunchAtLogin(settings.launchAtLogin)
         setReminderEnabled(settings.backupReminderEnabled)
         setReminderTime(settings.backupReminderTime)
+        setUpdateEnabled(settings.updateCheckEnabled)
+        setUpdateSource(settings.updateSource)
       })
       .catch(() => {})
   }, [])
@@ -99,6 +106,27 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
       setError(err instanceof Error ? err.message : String(err))
     }
   }
+
+  async function saveUpdatePreference(enabled: boolean, source: UpdateSource): Promise<void> {
+    try {
+      const settings = await window.api.settings.setUpdatePreference(enabled, source)
+      setUpdateEnabled(settings.updateCheckEnabled)
+      setUpdateSource(settings.updateSource)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const updateStatus = updater.checking
+    ? '正在检查…'
+    : updater.result?.hasUpdate
+      ? `发现新版本 v${updater.result.latestVersion}`
+      : updater.result?.error
+        ? updater.result.error
+        : updater.result
+          ? '已是最新版本'
+          : null
 
   return (
     <div className="flex h-full flex-col">
@@ -283,6 +311,60 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface px-5 py-4">
+            <h2 className="text-[13px] font-medium">更新</h2>
+
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[12px] text-muted">
+                  当前版本
+                  <span className="ml-1.5 font-mono text-[11px] text-ink/80">
+                    v{updater.currentVersion || '—'}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[11px] text-muted/60">
+                  从 GitHub / Gitee 读取公开的版本清单，不会上传本地数据
+                </div>
+              </div>
+              <button
+                type="button"
+                data-action="update-check"
+                disabled={updater.checking}
+                onClick={() => void updater.checkNow(true)}
+                className="h-7 shrink-0 rounded-md border border-line bg-paper px-2.5 text-[11px] text-muted transition-colors hover:text-ink disabled:opacity-50"
+              >
+                {updater.checking ? '检查中…' : '检查更新'}
+              </button>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-muted">
+                <input
+                  type="checkbox"
+                  checked={updateEnabled}
+                  onChange={(event) =>
+                    void saveUpdatePreference(event.target.checked, updateSource)
+                  }
+                  className="h-3 w-3 accent-[var(--color-accent)]"
+                />
+                启动后自动检查更新
+              </label>
+              <select
+                value={updateSource}
+                onChange={(event) =>
+                  void saveUpdatePreference(updateEnabled, event.target.value as UpdateSource)
+                }
+                className="h-7 rounded border border-line bg-paper px-2 text-[11px] text-muted outline-none focus:border-accent/50"
+              >
+                <option value="auto">自动（Gitee 优先）</option>
+                <option value="gitee">仅 Gitee</option>
+                <option value="github">仅 GitHub</option>
+              </select>
+            </div>
+
+            {updateStatus && <p className="mt-2 text-[11px] text-muted/80">{updateStatus}</p>}
           </section>
 
           <section className="rounded-xl border border-line bg-surface px-5 py-4">

@@ -76,7 +76,15 @@ const api: WorkRecordApi = {
     setLaunchAtLogin: (enabled) =>
       ipcRenderer.invoke('settings:set-launch-at-login', enabled),
     setBackupReminder: (enabled, time) =>
-      ipcRenderer.invoke('settings:set-backup-reminder', enabled, time)
+      ipcRenderer.invoke('settings:set-backup-reminder', enabled, time),
+    setUpdatePreference: (enabled, source) =>
+      ipcRenderer.invoke('settings:set-update-preference', enabled, source)
+  },
+  update: {
+    bootstrap: () => ipcRenderer.invoke('update:bootstrap'),
+    check: (manual) => ipcRenderer.invoke('update:check', Boolean(manual)),
+    dismiss: (version) => ipcRenderer.invoke('update:dismiss', version),
+    open: (url) => ipcRenderer.invoke('update:open', url)
   },
   clipboard: {
     write: (text) => ipcRenderer.invoke('clipboard:write', text)

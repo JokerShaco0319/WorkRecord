@@ -1,7 +1,7 @@
 {
   "name": "workrecord",
   "productName": "WorkRecord",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "本地 Markdown 工作记录与待办",
   "author": "WorkRecord",
   "main": "./out/main/index.js",
@@ -14,7 +14,8 @@
     "icons": "node scripts/build-icons.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "release:manifest": "node scripts/release.mjs"
   },
   "build": {
     "appId": "com.workrecord.app",
@@ -36,7 +37,11 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "WorkRecord-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "WorkRecord-Portable-${version}.${ext}"
     }
   },
   "dependencies": {

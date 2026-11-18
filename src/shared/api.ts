@@ -2,6 +2,7 @@ import type { DayDoc, EntryInput, EntryTarget } from './md/month'
 import type { ProjectStatus } from './md/project'
 import type { Quadrant, TodoDoc, TodoInput, TodoTarget } from './md/todo'
 import type { ArchiveItem, ArchiveTarget } from './md/todoArchive'
+import type { UpdateBootstrap, UpdateCheckResult, UpdateSource } from './update'
 
 export interface VaultInfo {
   path: string | null
@@ -68,6 +69,8 @@ export interface AppSettings {
   launchAtLogin: boolean
   backupReminderEnabled: boolean
   backupReminderTime: string
+  updateCheckEnabled: boolean
+  updateSource: UpdateSource
 }
 
 export interface AssetField {
@@ -209,6 +212,13 @@ export interface WorkRecordApi {
     setSecretClearSeconds(seconds: number): Promise<AppSettings>
     setLaunchAtLogin(enabled: boolean): Promise<AppSettings>
     setBackupReminder(enabled: boolean, time: string): Promise<AppSettings>
+    setUpdatePreference(enabled: boolean, source: UpdateSource): Promise<AppSettings>
+  }
+  update: {
+    bootstrap(): Promise<UpdateBootstrap>
+    check(manual?: boolean): Promise<UpdateCheckResult>
+    dismiss(version: string): Promise<void>
+    open(url: string): Promise<void>
   }
   clipboard: {
     write(text: string): Promise<void>

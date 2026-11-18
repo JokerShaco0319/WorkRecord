@@ -3,5 +3,6 @@ out/
 dist/
 release/
 .tmp/
+.idea/
 *.log
 .DS_Store

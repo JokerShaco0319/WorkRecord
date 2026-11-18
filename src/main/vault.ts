@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { UpdateSource } from '@shared/update'
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -13,6 +14,11 @@ export interface AppConfig {
   backupReminderEnabled: boolean
   backupReminderTime: string
   lastBackupReminderDate: string | null
+  updateCheckEnabled: boolean
+  updateSource: UpdateSource
+  lastSeenVersion: string | null
+  skippedVersion: string | null
+  lastUpdateCheck: string | null
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -22,7 +28,12 @@ const DEFAULT_CONFIG: AppConfig = {
   lastReminderDate: null,
   backupReminderEnabled: true,
   backupReminderTime: '18:00',
-  lastBackupReminderDate: null
+  lastBackupReminderDate: null,
+  updateCheckEnabled: true,
+  updateSource: 'auto',
+  lastSeenVersion: null,
+  skippedVersion: null,
+  lastUpdateCheck: null
 }
 const VAULT_FOLDERS = ['daily', 'weekly', 'projects', 'inbox', '.workrecord']
 

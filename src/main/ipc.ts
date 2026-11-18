@@ -16,6 +16,7 @@ import type {
 import { formatDateKey, formatTimeHm, monthKeyForDate } from '@shared/date'
 import type { ProjectStatus } from '@shared/md/project'
 import type { DayDoc, EntryInput, EntryTarget } from '@shared/md/month'
+import type { UpdateSource } from '@shared/update'
 import {
   appendEntry,
   dayDoc,
@@ -70,6 +71,13 @@ import {
 } from './security'
 import { computeStats, monthsBetween } from './stats'
 import { appendCompleted, listArchive, removeArchived } from './todoArchive'
+import {
+  bootstrapUpdate,
+  checkForUpdate,
+  dismissVersion,
+  invalidateUpdateCache,
+  openUpdateUrl
+} from './update'
 import type { AppConfig } from './vault'
 import {
   initializeVault,
@@ -110,7 +118,9 @@ function currentSettings(config: AppConfig): AppSettings {
     secretClearSeconds: config.secretClearSeconds,
     launchAtLogin: app.getLoginItemSettings().openAtLogin,
     backupReminderEnabled: config.backupReminderEnabled,
-    backupReminderTime: config.backupReminderTime
+    backupReminderTime: config.backupReminderTime,
+    updateCheckEnabled: config.updateCheckEnabled,
+    updateSource: config.updateSource
   }
 }
 
@@ -676,6 +686,32 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       )
     }
   )
+
+  ipcMain.handle(
+    'settings:set-update-preference',
+    async (_event, enabled: boolean, source: UpdateSource): Promise<AppSettings> => {
+      if (source !== 'auto' && source !== 'github' && source !== 'gitee') {
+        throw new Error(`非法的更新源：${source}`)
+      }
+      invalidateUpdateCache()
+      return currentSettings(
+        await updateAppConfig({ updateCheckEnabled: Boolean(enabled), updateSource: source })
+      )
+    }
+  )
+
+  ipcMain.handle('update:bootstrap', () => bootstrapUpdate())
+
+  ipcMain.handle('update:check', (_event, manual?: boolean) => checkForUpdate(Boolean(manual)))
+
+  ipcMain.handle('update:dismiss', async (_event, version: string): Promise<void> => {
+    if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error(`非法的版本号：${version}`)
+    await dismissVersion(version)
+  })
+
+  ipcMain.handle('update:open', async (_event, url: string): Promise<void> => {
+    await openUpdateUrl(url)
+  })
 
   ipcMain.handle('clipboard:write', async (_event, text: string): Promise<void> => {
     await clipboard.writeText(text)
