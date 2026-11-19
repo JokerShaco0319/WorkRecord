@@ -6,6 +6,7 @@ import { formatDateKey } from '@shared/date'
 import windowIcon from '../../resources/icon.png?asset'
 import trayIcon from '../../resources/tray.png?asset'
 import { openCapture } from './capture'
+import { resolveDataPaths } from './dataPaths'
 import { registerIpc } from './ipc'
 import { notifyBackupReminder, notifyDueTodos } from './reminders'
 import { migrateCompletedTodos } from './todoArchive'
@@ -15,35 +16,46 @@ app.setName('WorkRecord')
 app.setAppUserModelId('com.workrecord.app')
 
 /**
- * 应用自身产生的数据（配置、缓存）统一放在可执行文件旁的 data 目录：
- * 安装版 → <安装目录>/data，免安装版 → exe 所在目录/data。
- * 开发态沿用系统默认位置；自动化测试可用 WORKRECORD_USER_DATA 覆盖。
+ * 安装版：配置放 %APPDATA%，缓存/更新包放 %LOCALAPPDATA%，更新或卸载应用不会丢失；
+ * 便携版：继续使用 exe 旁的 data 目录；开发态沿用系统默认位置。
  */
-function resolveDataDir(): string | null {
-  if (process.env.WORKRECORD_USER_DATA) return process.env.WORKRECORD_USER_DATA
-  if (process.env.PORTABLE_EXECUTABLE_DIR) {
-    return join(process.env.PORTABLE_EXECUTABLE_DIR, 'data')
-  }
-  if (app.isPackaged) return join(dirname(app.getPath('exe')), 'data')
-  return null
-}
-
 const legacyUserData = app.getPath('userData')
-const dataDir = resolveDataDir()
+const dataPaths = resolveDataPaths({
+  env: process.env,
+  isPackaged: app.isPackaged,
+  appData: app.getPath('appData'),
+  localAppData: process.env.LOCALAPPDATA ?? app.getPath('appData')
+})
 
-if (dataDir) {
+if (dataPaths) {
   try {
-    mkdirSync(dataDir, { recursive: true })
-    app.setPath('userData', dataDir)
+    mkdirSync(dataPaths.userData, { recursive: true })
+    app.setPath('userData', dataPaths.userData)
+    mkdirSync(dataPaths.sessionData, { recursive: true })
+    app.setPath('sessionData', dataPaths.sessionData)
+    mkdirSync(dataPaths.crashDumps, { recursive: true })
+    app.setPath('crashDumps', dataPaths.crashDumps)
+  } catch (err) {
+    console.error('无法在用户目录写入数据，回退到系统默认位置：', err)
+  }
 
-    // 老版本配置在 %APPDATA% 下，首次启动搬到新位置，避免丢失数据目录选择
-    const legacyConfig = join(legacyUserData, 'config.json')
-    const dataConfig = join(dataDir, 'config.json')
-    if (!existsSync(dataConfig) && existsSync(legacyConfig)) {
-      copyFileSync(legacyConfig, dataConfig)
+  // 旧版本把配置放在安装目录或 %APPDATA%，首次启动时复制过来，避免丢失数据目录选择
+  try {
+    const target = join(dataPaths.userData, 'config.json')
+    if (!existsSync(target)) {
+      const candidates = [
+        join(dirname(app.getPath('exe')), 'data', 'config.json'),
+        join(legacyUserData, 'config.json')
+      ]
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+          copyFileSync(candidate, target)
+          break
+        }
+      }
     }
   } catch (err) {
-    console.error('无法在应用目录写入数据，回退到系统默认位置：', err)
+    console.error('迁移旧配置失败：', err)
   }
 }
 

@@ -18,6 +18,7 @@ import {
   type UpdateSource
 } from '@shared/update'
 import { appConfigPath, readAppConfig, updateAppConfig } from './vault'
+import { resolveDataPaths } from './dataPaths'
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 8000
@@ -105,6 +106,16 @@ export async function openUpdateUrl(url: string): Promise<void> {
   await shell.openExternal(url)
 }
 
+function updatesDir(): string {
+  const paths = resolveDataPaths({
+    env: process.env,
+    isPackaged: app.isPackaged,
+    appData: app.getPath('appData'),
+    localAppData: process.env.LOCALAPPDATA ?? app.getPath('appData')
+  })
+  return paths ? paths.updates : join(app.getPath('userData'), 'updates')
+}
+
 /** 后台下载安装包；下载完成后由渲染进程提示安装。 */
 export async function downloadUpdate(
   url: string,
@@ -117,7 +128,7 @@ export async function downloadUpdate(
   const name = decodeURIComponent(new URL(url).pathname.split('/').pop() ?? '')
   if (!/^[\w.-]+\.exe$/i.test(name)) throw new Error('更新包文件名不合法')
 
-  const dir = join(app.getPath('userData'), 'updates')
+  const dir = updatesDir()
   await mkdir(dir, { recursive: true })
   const target = join(dir, name)
 
@@ -183,7 +194,7 @@ export function cancelDownload(): void {
 
 /** 启动已下载的安装程序；安装器接管后退出应用。 */
 export async function installUpdate(filePath: string): Promise<void> {
-  const dir = resolve(app.getPath('userData'), 'updates')
+  const dir = resolve(updatesDir())
   const target = resolve(filePath)
   if (!target.startsWith(`${dir}${sep}`) || !/\.exe$/i.test(target) || !existsSync(target)) {
     throw new Error('更新包路径不合法')
