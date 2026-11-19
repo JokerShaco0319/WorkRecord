@@ -62,14 +62,13 @@ const api: WorkRecordApi = {
     archiveFolder: (project, category, path) =>
       ipcRenderer.invoke('files:archive-folder', project, category, path),
     listArchived: (project) => ipcRenderer.invoke('files:list-archived', project),
-    restoreArchived: (project, category, path) =>
-      ipcRenderer.invoke('files:restore-archived', project, category, path),
-    trashArchived: (project, category, path) =>
-      ipcRenderer.invoke('files:trash-archived', project, category, path),
-    openArchived: (project, category, path) =>
-      ipcRenderer.invoke('files:open-archived', project, category, path),
-    revealArchived: (project, category, path) =>
-      ipcRenderer.invoke('files:reveal-archived', project, category, path),
+    restoreArchived: (project, id) =>
+      ipcRenderer.invoke('files:restore-archived', project, id),
+    trashArchived: (project, id) => ipcRenderer.invoke('files:trash-archived', project, id),
+    openArchived: (project, id, path) =>
+      ipcRenderer.invoke('files:open-archived', project, id, path),
+    revealArchived: (project, id, path) =>
+      ipcRenderer.invoke('files:reveal-archived', project, id, path),
     createFolder: (project, category, dir, name) =>
       ipcRenderer.invoke('files:create-folder', project, category, dir, name),
     pathOf: (file) => webUtils.getPathForFile(file)

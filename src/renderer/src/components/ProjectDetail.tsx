@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
-  ArchivedFileInfo,
+  ArchiveEntry,
   ProjectDetail as ProjectDetailData,
   ProjectFileInfo
 } from '@shared/api'
@@ -61,7 +61,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
   const [folderName, setFolderName] = useState('')
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
   const [folderRenameValue, setFolderRenameValue] = useState('')
-  const [archived, setArchived] = useState<ArchivedFileInfo[]>([])
+  const [archived, setArchived] = useState<ArchiveEntry[]>([])
   const [archivedLoading, setArchivedLoading] = useState(false)
   const confirmTimer = useRef<number | null>(null)
 
@@ -172,9 +172,9 @@ export default function ProjectDetail({ name, onBack }: Props) {
     }
   }
 
-  async function restoreArchivedItem(file: ArchivedFileInfo): Promise<void> {
+  async function restoreArchivedItem(entry: ArchiveEntry): Promise<void> {
     try {
-      setArchived(await window.api.files.restoreArchived(name, file.category, file.path))
+      setArchived(await window.api.files.restoreArchived(name, entry.id))
       await load()
       setError(null)
     } catch (err) {
@@ -182,9 +182,9 @@ export default function ProjectDetail({ name, onBack }: Props) {
     }
   }
 
-  async function trashArchivedItem(file: ArchivedFileInfo): Promise<void> {
+  async function trashArchivedItem(entry: ArchiveEntry): Promise<void> {
     try {
-      setArchived(await window.api.files.trashArchived(name, file.category, file.path))
+      setArchived(await window.api.files.trashArchived(name, entry.id))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -456,75 +456,120 @@ export default function ProjectDetail({ name, onBack }: Props) {
               <div>
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <p className="text-[12px] text-muted">
-                    {archivedLoading ? '正在读取…' : `共 ${archived.length} 个归档文件`}
+                    {archivedLoading ? '正在读取…' : `共 ${archived.length} 个归档记录`}
                   </p>
                 </div>
 
                 {!archivedLoading && archived.length === 0 ? (
                   <div className="mt-16 text-center">
-                    <p className="text-sm text-muted">还没有归档文件</p>
+                    <p className="text-sm text-muted">还没有归档记录</p>
                     <p className="mt-1 text-xs text-muted/70">
-                      在文件列表中点击归档按钮，文件会按原结构移到这里
+                      归档文件时会自动带上文档里的相对链接资产
                     </p>
                   </div>
                 ) : (
-                  <ul className="space-y-0.5">
-                    {archived.map((file) => (
+                  <ul className="space-y-1">
+                    {archived.map((entry) => (
                       <li
-                        key={`${file.category}/${file.path}`}
-                        onDoubleClick={() =>
-                          void window.api.files.openArchived(name, file.category, file.path)
-                        }
-                        title="双击用系统默认程序打开"
-                        className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface"
+                        key={entry.id}
+                        className="rounded-lg px-3 py-2 transition-colors hover:bg-surface"
                       >
-                        <FileIcon className="h-4 w-4 shrink-0 text-muted/70" />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px]">{file.name}</div>
-                          <div className="truncate text-[11px] text-muted/60">
-                            {file.category} / {file.path}
+                        <div className="flex items-center gap-3">
+                          {entry.kind === 'folder' ? (
+                            <FolderIcon className="h-4 w-4 shrink-0 text-muted/70" />
+                          ) : (
+                            <FileIcon className="h-4 w-4 shrink-0 text-muted/70" />
+                          )}
+                          <div
+                            className="min-w-0 flex-1"
+                            title={entry.kind === 'file' ? '双击用系统默认程序打开' : ''}
+                            onDoubleClick={() => {
+                              const file = entry.files[0]
+                              if (entry.kind === 'file' && file) {
+                                void window.api.files.openArchived(name, entry.id, file.path)
+                              }
+                            }}
+                          >
+                            <div className="truncate text-[13px]">{entry.name}</div>
+                            <div className="truncate text-[11px] text-muted/60">
+                              {entry.root}
+                              {entry.kind === 'folder' ? ` · ${entry.files.length} 个文件` : ''}
+                              {entry.legacy ? ' · 旧版归档' : ''}
+                            </div>
+                          </div>
+                          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted/60">
+                            {formatModified(entry.archivedAt)}
+                          </span>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              data-action="archived-restore"
+                              onClick={() => void restoreArchivedItem(entry)}
+                              className="h-6 rounded px-1.5 text-[11px] text-accent transition-colors hover:bg-accent-soft"
+                            >
+                              恢复
+                            </button>
+                            <button
+                              type="button"
+                              title="删除到回收站"
+                              data-action="archived-delete"
+                              onClick={() => void trashArchivedItem(entry)}
+                              className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-red-50 hover:text-red-600"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </div>
-                        <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
-                          {formatSize(file.size)}
-                        </span>
-                        <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
-                          {formatModified(file.modified)}
-                        </span>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            data-action="archived-restore"
-                            onClick={() => void restoreArchivedItem(file)}
-                            className="h-6 rounded px-1.5 text-[11px] text-accent transition-colors hover:bg-accent-soft"
-                          >
-                            恢复
-                          </button>
-                          <button
-                            type="button"
-                            title="在文件夹中显示"
-                            data-action="archived-reveal"
-                            onClick={() =>
-                              void window.api.files.revealArchived(
-                                name,
-                                file.category,
-                                file.path
-                              )
-                            }
-                            className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
-                          >
-                            <FolderIcon className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            title="删除到回收站"
-                            data-action="archived-delete"
-                            onClick={() => void trashArchivedItem(file)}
-                            className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-red-50 hover:text-red-600"
-                          >
-                            <TrashIcon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+
+                        {entry.kind === 'file' && entry.files[0] && (
+                          <div className="ml-7 mt-0.5 flex items-center gap-3 text-[11px] text-muted/60">
+                            <span>{formatSize(entry.files[0].size)}</span>
+                            <span>{formatModified(entry.files[0].modified)}</span>
+                            {entry.files.length > 1 && (
+                              <span>含 {entry.files.length - 1} 个关联文件</span>
+                            )}
+                          </div>
+                        )}
+
+                        {entry.kind === 'folder' && entry.files.length > 0 && (
+                          <ul className="ml-7 mt-1 space-y-0.5">
+                            {entry.files.map((file) => (
+                              <li
+                                key={file.path}
+                                className="group flex items-center gap-2 rounded px-2 py-1 hover:bg-paper"
+                              >
+                                <FileIcon className="h-3.5 w-3.5 shrink-0 text-muted/60" />
+                                <span
+                                  className="min-w-0 flex-1 truncate text-[12px] text-muted"
+                                  title="双击用系统默认程序打开"
+                                  onDoubleClick={() =>
+                                    void window.api.files.openArchived(name, entry.id, file.path)
+                                  }
+                                >
+                                  {file.path}
+                                </span>
+                                <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted/60">
+                                  {formatSize(file.size)}
+                                </span>
+                                <button
+                                  type="button"
+                                  title="在文件夹中显示"
+                                  data-action="archived-reveal"
+                                  onClick={() =>
+                                    void window.api.files.revealArchived(
+                                      name,
+                                      entry.id,
+                                      file.path
+                                    )
+                                  }
+                                  className="grid h-6 w-6 shrink-0 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                                >
+                                  <FolderIcon className="h-3.5 w-3.5" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </li>
                     ))}
                   </ul>

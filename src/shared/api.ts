@@ -22,13 +22,26 @@ export interface ProjectFileInfo {
   modified: string
 }
 
-export interface ArchivedFileInfo {
-  category: string
-  /** 归档时保留的原始相对路径 */
+export interface ArchiveFileEntry {
+  /** 原项目相对路径，例如「需求/草图/a.md」 */
   path: string
   name: string
   size: number
   modified: string
+}
+
+export interface ArchiveEntry {
+  id: string
+  /** 被归档的根节点，项目相对路径 */
+  root: string
+  name: string
+  kind: 'file' | 'folder'
+  category: string
+  archivedAt: string
+  /** 归档记录包含的所有文件（含依赖） */
+  files: ArchiveFileEntry[]
+  /** 0.3.0 之前产生的归档，没有依赖清单 */
+  legacy: boolean
 }
 
 export interface ProjectFolderInfo {
@@ -201,15 +214,11 @@ export interface WorkRecordApi {
     ): Promise<ProjectDetail>
     archive(project: string, category: string, path: string): Promise<ProjectDetail>
     archiveFolder(project: string, category: string, path: string): Promise<ProjectDetail>
-    listArchived(project: string): Promise<ArchivedFileInfo[]>
-    restoreArchived(
-      project: string,
-      category: string,
-      path: string
-    ): Promise<ArchivedFileInfo[]>
-    trashArchived(project: string, category: string, path: string): Promise<ArchivedFileInfo[]>
-    openArchived(project: string, category: string, path: string): Promise<void>
-    revealArchived(project: string, category: string, path: string): Promise<void>
+    listArchived(project: string): Promise<ArchiveEntry[]>
+    restoreArchived(project: string, id: string): Promise<ArchiveEntry[]>
+    trashArchived(project: string, id: string): Promise<ArchiveEntry[]>
+    openArchived(project: string, id: string, path: string): Promise<void>
+    revealArchived(project: string, id: string, path: string): Promise<void>
     createFolder(
       project: string,
       category: string,
