@@ -1,11 +1,11 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.2",
   "date": "2026-11-19",
-  "notes": "### 新增\n- 项目文件支持归档：归档后按原分类和目录结构移入项目的隐藏归档目录，不再显示在文件列表\n- 项目页新增「归档」视图，可查看、打开、恢复到原位置或删除归档文件\n- 目录也支持整体归档",
-  "sha256": "ce00c62c7c65751d4900cad009381ee777954823b3fd1146258a76649b2bb69c",
+  "notes": "### 修复\n- 安装版的配置和运行数据改存到 `%APPDATA%\\WorkRecord`，升级或卸载应用不再丢失默认数据目录、主题等设置\n- 缓存、崩溃转储与更新包改存 `%LOCALAPPDATA%\\WorkRecord`，不占用安装目录\n- 首次启动自动迁移旧版安装目录下的 `config.json`\n- 便携版仍使用 exe 旁的 `data` 目录",
+  "sha256": "c042ccf16a0b684856f217b5fa4c2aefbf7240b69f17f3838c3370f1e1db4ab0",
   "downloads": {
-    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.0/WorkRecord-Setup-0.3.0.exe",
-    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.0/WorkRecord-Setup-0.3.0.exe",
-    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.0/WorkRecord-Setup-0.3.0.exe"
+    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.2/WorkRecord-Setup-0.3.2.exe",
+    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.2/WorkRecord-Setup-0.3.2.exe",
+    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.2/WorkRecord-Setup-0.3.2.exe"
   }
 }
