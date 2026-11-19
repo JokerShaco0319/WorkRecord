@@ -1,11 +1,11 @@
 {
-  "version": "0.3.2",
+  "version": "0.3.3",
   "date": "2026-11-19",
-  "notes": "### 修复\n- 安装版的配置和运行数据改存到 `%APPDATA%\\WorkRecord`，升级或卸载应用不再丢失默认数据目录、主题等设置\n- 缓存、崩溃转储与更新包改存 `%LOCALAPPDATA%\\WorkRecord`，不占用安装目录\n- 首次启动自动迁移旧版安装目录下的 `config.json`\n- 便携版仍使用 exe 旁的 `data` 目录",
-  "sha256": "c042ccf16a0b684856f217b5fa4c2aefbf7240b69f17f3838c3370f1e1db4ab0",
+  "notes": "### 修复\n- 修复点击「立即安装」时提示应用仍在运行、无法安装的问题：改为先退出应用，再由独立进程延迟启动安装程序",
+  "sha256": "ef9cf486409ad863b55a97761daca4fe9c61d7844a08764e8d1b8936e6dacbde",
   "downloads": {
-    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.2/WorkRecord-Setup-0.3.2.exe",
-    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.2/WorkRecord-Setup-0.3.2.exe",
-    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.2/WorkRecord-Setup-0.3.2.exe"
+    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.3/WorkRecord-Setup-0.3.3.exe",
+    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.3/WorkRecord-Setup-0.3.3.exe",
+    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.3/WorkRecord-Setup-0.3.3.exe"
   }
 }
