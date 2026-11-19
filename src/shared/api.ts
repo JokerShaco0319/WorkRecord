@@ -22,6 +22,15 @@ export interface ProjectFileInfo {
   modified: string
 }
 
+export interface ArchivedFileInfo {
+  category: string
+  /** 归档时保留的原始相对路径 */
+  path: string
+  name: string
+  size: number
+  modified: string
+}
+
 export interface ProjectFolderInfo {
   category: string
   /** 相对分类目录的路径，例如「草图」 */
@@ -190,6 +199,17 @@ export interface WorkRecordApi {
       path: string,
       toCategory: string
     ): Promise<ProjectDetail>
+    archive(project: string, category: string, path: string): Promise<ProjectDetail>
+    archiveFolder(project: string, category: string, path: string): Promise<ProjectDetail>
+    listArchived(project: string): Promise<ArchivedFileInfo[]>
+    restoreArchived(
+      project: string,
+      category: string,
+      path: string
+    ): Promise<ArchivedFileInfo[]>
+    trashArchived(project: string, category: string, path: string): Promise<ArchivedFileInfo[]>
+    openArchived(project: string, category: string, path: string): Promise<void>
+    revealArchived(project: string, category: string, path: string): Promise<void>
     createFolder(
       project: string,
       category: string,

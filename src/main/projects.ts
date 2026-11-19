@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
 import type {
+  ArchivedFileInfo,
   ProjectDetail,
   ProjectFileInfo,
   ProjectFolderInfo,
@@ -17,6 +18,7 @@ import {
 } from '@shared/md/project'
 
 const PROJECT_FILE = '_project.md'
+const ARCHIVE_DIR = '.archive'
 const INVALID_SEGMENT = /[\\/:*?"<>|]/
 const MAX_DEPTH = 8
 
@@ -360,5 +362,126 @@ export async function moveFile(
 
   const target = await uniqueTargetPath(targetDir, basename(source))
   if (resolve(target) === resolve(source)) return
+  await rename(source, target)
+}
+
+/** 归档文件保存在项目下的隐藏目录，按「分类/原路径」保留结构 */
+export function archivedPath(
+  vaultPath: string,
+  project: string,
+  category: string,
+  relativePath: string
+): string {
+  const safe = assertRelativePath(relativePath, '路径')
+  if (!safe) throw new Error('缺少文件路径')
+  return join(
+    projectDirPath(vaultPath, project),
+    ARCHIVE_DIR,
+    assertSegment(category, '分类名'),
+    ...safe.split('/')
+  )
+}
+
+function archivedTargetDir(
+  vaultPath: string,
+  project: string,
+  category: string,
+  relativePath: string
+): string {
+  const dirPart = relativePath.includes('/')
+    ? relativePath.slice(0, relativePath.lastIndexOf('/'))
+    : ''
+  const base = join(
+    projectDirPath(vaultPath, project),
+    ARCHIVE_DIR,
+    assertSegment(category, '分类名')
+  )
+  return dirPart ? join(base, ...dirPart.split('/')) : base
+}
+
+export async function archiveFile(
+  vaultPath: string,
+  project: string,
+  category: string,
+  filePath: string
+): Promise<void> {
+  const relative = assertRelativePath(filePath, '路径')
+  if (!relative) throw new Error('缺少文件路径')
+
+  const source = resolveInsideCategory(vaultPath, project, category, relative)
+  const info = await stat(source).catch(() => null)
+  if (!info || !info.isFile()) throw new Error('文件不存在')
+
+  const targetDir = archivedTargetDir(vaultPath, project, category, relative)
+  await mkdir(targetDir, { recursive: true })
+  const target = await uniqueTargetPath(targetDir, basename(source))
+  await rename(source, target)
+}
+
+export async function archiveFolder(
+  vaultPath: string,
+  project: string,
+  category: string,
+  folderPath: string
+): Promise<void> {
+  const relative = assertRelativePath(folderPath, '路径')
+  if (!relative) throw new Error('缺少目录路径')
+
+  const source = resolveInsideCategory(vaultPath, project, category, relative)
+  const info = await stat(source).catch(() => null)
+  if (!info || !info.isDirectory()) throw new Error('目录不存在')
+
+  const targetDir = archivedTargetDir(vaultPath, project, category, relative)
+  await mkdir(targetDir, { recursive: true })
+  const target = await uniqueTargetPath(targetDir, basename(source))
+  await rename(source, target)
+}
+
+export async function listArchived(
+  vaultPath: string,
+  project: string
+): Promise<ArchivedFileInfo[]> {
+  const root = join(projectDirPath(vaultPath, project), ARCHIVE_DIR)
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
+  const result: ArchivedFileInfo[] = []
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+    const files: WalkedFile[] = []
+    const folders: string[] = []
+    await walkCategory(join(root, entry.name), '', 0, files, folders)
+    for (const file of files) {
+      result.push({ category: entry.name, ...file })
+    }
+  }
+
+  result.sort(
+    (left, right) =>
+      left.category.localeCompare(right.category) || left.path.localeCompare(right.path)
+  )
+  return result
+}
+
+export async function restoreArchived(
+  vaultPath: string,
+  project: string,
+  category: string,
+  relativePath: string
+): Promise<void> {
+  const relative = assertRelativePath(relativePath, '路径')
+  if (!relative) throw new Error('缺少文件路径')
+
+  const source = archivedPath(vaultPath, project, category, relative)
+  const info = await stat(source).catch(() => null)
+  if (!info || !info.isFile()) throw new Error('归档文件不存在')
+
+  const dirPart = relative.includes('/')
+    ? relative.slice(0, relative.lastIndexOf('/'))
+    : ''
+  const base = categoryDirPath(vaultPath, project, category)
+  const targetDir = dirPart ? join(base, ...dirPart.split('/')) : base
+  await mkdir(targetDir, { recursive: true })
+
+  const target = await uniqueTargetPath(targetDir, basename(source))
   await rename(source, target)
 }

@@ -62,6 +62,16 @@ export function ChevronRightIcon({ className }: IconProps) {
   )
 }
 
+export function ArchiveIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <rect x="2.5" y="3" width="11" height="3" rx="1" />
+      <path d="M3.6 6v5.4c0 .9.7 1.6 1.6 1.6h5.6c.9 0 1.6-.7 1.6-1.6V6" />
+      <path d="M6.6 8.6h2.8" />
+    </svg>
+  )
+}
+
 export function PencilIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

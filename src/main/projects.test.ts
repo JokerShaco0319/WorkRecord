@@ -1,20 +1,25 @@
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   addCategory,
+  archiveFile,
+  archiveFolder,
   assertRelativePath,
   assertSegment,
   createFolder,
   createProject,
   importFiles,
+  listArchived,
   listProjects,
   moveFile,
   readProject,
   renameFile,
   renameFolder,
   resolveInsideCategory,
+  restoreArchived,
   setProjectStatus
 } from './projects'
 
@@ -298,5 +303,64 @@ describe('子目录', () => {
     await createFolder(vault, '项目A', '需求', '', '草图2')
 
     await expect(renameFolder(vault, '项目A', '需求', '草图', '草图2')).rejects.toThrow()
+  })
+})
+
+describe('归档', () => {
+  it('归档文件后不在项目文件里展示，归档列表保留原路径', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '', [join(sourceDir, 'a.md')])
+
+    await archiveFile(vault, '项目A', '需求', 'a.md')
+
+    expect((await readProject(vault, '项目A')).fileCount).toBe(0)
+    expect(await listArchived(vault, '项目A')).toEqual([
+      expect.objectContaining({ category: '需求', path: 'a.md', name: 'a.md' })
+    ])
+    expect(existsSync(join(vault, 'projects', '项目A', '.archive', '需求', 'a.md'))).toBe(true)
+  })
+
+  it('恢复归档文件回到原位置', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '草图', [join(sourceDir, 'a.md')])
+    await archiveFile(vault, '项目A', '需求', '草图/a.md')
+
+    await restoreArchived(vault, '项目A', '需求', '草图/a.md')
+
+    const project = await readProject(vault, '项目A')
+    expect(project.files[0]).toMatchObject({ category: '需求', path: '草图/a.md' })
+    expect(await listArchived(vault, '项目A')).toEqual([])
+  })
+
+  it('归档目录保留内部结构', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await createFolder(vault, '项目A', '需求', '', '草图')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '草图', [join(sourceDir, 'a.md')])
+
+    await archiveFolder(vault, '项目A', '需求', '草图')
+
+    const project = await readProject(vault, '项目A')
+    expect(project.folders).toEqual([])
+    expect(project.fileCount).toBe(0)
+    expect(await listArchived(vault, '项目A')).toEqual([
+      expect.objectContaining({ category: '需求', path: '草图/a.md' })
+    ])
+  })
+
+  it('归档同名文件不覆盖已有文件', async () => {
+    await createProject(vault, '项目A', '2026-11-16')
+    await writeFile(join(sourceDir, 'a.md'), 'x', 'utf-8')
+    await importFiles(vault, '项目A', '需求', '', [join(sourceDir, 'a.md')])
+    await archiveFile(vault, '项目A', '需求', 'a.md')
+
+    await writeFile(join(join(vault, 'projects', '项目A', '需求'), 'a.md'), 'y', 'utf-8')
+    await archiveFile(vault, '项目A', '需求', 'a.md')
+
+    const names = (await listArchived(vault, '项目A')).map((file) => file.name).sort()
+    expect(names).toEqual(['a (1).md', 'a.md'])
   })
 })

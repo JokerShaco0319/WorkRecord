@@ -57,6 +57,19 @@ const api: WorkRecordApi = {
       ipcRenderer.invoke('files:rename-folder', project, category, path, newName),
     move: (project, category, path, toCategory) =>
       ipcRenderer.invoke('files:move', project, category, path, toCategory),
+    archive: (project, category, path) =>
+      ipcRenderer.invoke('files:archive', project, category, path),
+    archiveFolder: (project, category, path) =>
+      ipcRenderer.invoke('files:archive-folder', project, category, path),
+    listArchived: (project) => ipcRenderer.invoke('files:list-archived', project),
+    restoreArchived: (project, category, path) =>
+      ipcRenderer.invoke('files:restore-archived', project, category, path),
+    trashArchived: (project, category, path) =>
+      ipcRenderer.invoke('files:trash-archived', project, category, path),
+    openArchived: (project, category, path) =>
+      ipcRenderer.invoke('files:open-archived', project, category, path),
+    revealArchived: (project, category, path) =>
+      ipcRenderer.invoke('files:reveal-archived', project, category, path),
     createFolder: (project, category, dir, name) =>
       ipcRenderer.invoke('files:create-folder', project, category, dir, name),
     pathOf: (file) => webUtils.getPathForFile(file)

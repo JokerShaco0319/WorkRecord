@@ -47,15 +47,20 @@ import {
 import { createBackup, listBackups, restoreBackup } from './backup'
 import {
   addCategory,
+  archiveFile,
+  archiveFolder,
+  archivedPath,
   createFolder,
   createProject,
   importFiles,
+  listArchived,
   listProjects,
   moveFile,
   projectDirPath,
   readProject,
   renameFile,
   renameFolder,
+  restoreArchived,
   resolveInsideCategory,
   setProjectStatus
 } from './projects'
@@ -545,6 +550,74 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       const vaultPath = await requireVault()
       await createFolder(vaultPath, project, category, dir, name)
       return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:archive',
+    async (
+      _event,
+      project: string,
+      category: string,
+      path: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await archiveFile(vaultPath, project, category, path)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:archive-folder',
+    async (
+      _event,
+      project: string,
+      category: string,
+      path: string
+    ): Promise<ProjectDetail> => {
+      const vaultPath = await requireVault()
+      await archiveFolder(vaultPath, project, category, path)
+      return readProject(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle('files:list-archived', async (_event, project: string) => {
+    const vaultPath = await requireVault()
+    return listArchived(vaultPath, project)
+  })
+
+  ipcMain.handle(
+    'files:restore-archived',
+    async (_event, project: string, category: string, path: string) => {
+      const vaultPath = await requireVault()
+      await restoreArchived(vaultPath, project, category, path)
+      return listArchived(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:trash-archived',
+    async (_event, project: string, category: string, path: string) => {
+      const vaultPath = await requireVault()
+      await shell.trashItem(archivedPath(vaultPath, project, category, path))
+      return listArchived(vaultPath, project)
+    }
+  )
+
+  ipcMain.handle(
+    'files:open-archived',
+    async (_event, project: string, category: string, path: string): Promise<void> => {
+      const vaultPath = await requireVault()
+      const error = await shell.openPath(archivedPath(vaultPath, project, category, path))
+      if (error) throw new Error(error)
+    }
+  )
+
+  ipcMain.handle(
+    'files:reveal-archived',
+    async (_event, project: string, category: string, path: string): Promise<void> => {
+      const vaultPath = await requireVault()
+      shell.showItemInFolder(archivedPath(vaultPath, project, category, path))
     }
   )
 

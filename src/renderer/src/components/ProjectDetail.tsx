@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ProjectDetail as ProjectDetailData, ProjectFileInfo } from '@shared/api'
+import type {
+  ArchivedFileInfo,
+  ProjectDetail as ProjectDetailData,
+  ProjectFileInfo
+} from '@shared/api'
 import type { ProjectStatus } from '@shared/md/project'
 import AssetsPanel from './AssetsPanel'
 import FileTree from './FileTree'
 import {
+  ArchiveIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   FileIcon,
@@ -42,7 +47,7 @@ function baseName(value: string): string {
 export default function ProjectDetail({ name, onBack }: Props) {
   const [detail, setDetail] = useState<ProjectDetailData | null>(null)
   const [category, setCategory] = useState<string | null>(null)
-  const [mode, setMode] = useState<'files' | 'assets'>('files')
+  const [mode, setMode] = useState<'files' | 'assets' | 'archived'>('files')
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newCategory, setNewCategory] = useState('')
@@ -56,6 +61,8 @@ export default function ProjectDetail({ name, onBack }: Props) {
   const [folderName, setFolderName] = useState('')
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
   const [folderRenameValue, setFolderRenameValue] = useState('')
+  const [archived, setArchived] = useState<ArchivedFileInfo[]>([])
+  const [archivedLoading, setArchivedLoading] = useState(false)
   const confirmTimer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
@@ -72,6 +79,22 @@ export default function ProjectDetail({ name, onBack }: Props) {
   useEffect(() => {
     void load()
   }, [load])
+
+  const loadArchived = useCallback(async () => {
+    setArchivedLoading(true)
+    try {
+      setArchived(await window.api.files.listArchived(name))
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setArchivedLoading(false)
+    }
+  }, [name])
+
+  useEffect(() => {
+    if (mode === 'archived') void loadArchived()
+  }, [mode, loadArchived])
 
   useEffect(() => {
     return () => {
@@ -123,6 +146,45 @@ export default function ProjectDetail({ name, onBack }: Props) {
 
     try {
       setDetail(await window.api.files.move(name, file.category, file.path, toCategory))
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function archiveItem(file: ProjectFileInfo): Promise<void> {
+    try {
+      setDetail(await window.api.files.archive(name, file.category, file.path))
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function archiveFolderItem(folder: string): Promise<void> {
+    if (!category) return
+    try {
+      setDetail(await window.api.files.archiveFolder(name, category, folder))
+      if (path === folder || path.startsWith(`${folder}/`)) setPath('')
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function restoreArchivedItem(file: ArchivedFileInfo): Promise<void> {
+    try {
+      setArchived(await window.api.files.restoreArchived(name, file.category, file.path))
+      await load()
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function trashArchivedItem(file: ArchivedFileInfo): Promise<void> {
+    try {
+      setArchived(await window.api.files.trashArchived(name, file.category, file.path))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -266,7 +328,8 @@ export default function ProjectDetail({ name, onBack }: Props) {
                 {(
                   [
                     ['files', '文件'],
-                    ['assets', '加密资产']
+                    ['assets', '加密资产'],
+                    ['archived', '归档']
                   ] as const
                 ).map(([key, label]) => (
                   <button
@@ -389,6 +452,84 @@ export default function ProjectDetail({ name, onBack }: Props) {
           <div className="min-w-0 flex-1 overflow-y-auto pb-4">
             {mode === 'assets' ? (
               <AssetsPanel project={name} />
+            ) : mode === 'archived' ? (
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <p className="text-[12px] text-muted">
+                    {archivedLoading ? '正在读取…' : `共 ${archived.length} 个归档文件`}
+                  </p>
+                </div>
+
+                {!archivedLoading && archived.length === 0 ? (
+                  <div className="mt-16 text-center">
+                    <p className="text-sm text-muted">还没有归档文件</p>
+                    <p className="mt-1 text-xs text-muted/70">
+                      在文件列表中点击归档按钮，文件会按原结构移到这里
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {archived.map((file) => (
+                      <li
+                        key={`${file.category}/${file.path}`}
+                        onDoubleClick={() =>
+                          void window.api.files.openArchived(name, file.category, file.path)
+                        }
+                        title="双击用系统默认程序打开"
+                        className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface"
+                      >
+                        <FileIcon className="h-4 w-4 shrink-0 text-muted/70" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px]">{file.name}</div>
+                          <div className="truncate text-[11px] text-muted/60">
+                            {file.category} / {file.path}
+                          </div>
+                        </div>
+                        <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
+                          {formatSize(file.size)}
+                        </span>
+                        <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
+                          {formatModified(file.modified)}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            data-action="archived-restore"
+                            onClick={() => void restoreArchivedItem(file)}
+                            className="h-6 rounded px-1.5 text-[11px] text-accent transition-colors hover:bg-accent-soft"
+                          >
+                            恢复
+                          </button>
+                          <button
+                            type="button"
+                            title="在文件夹中显示"
+                            data-action="archived-reveal"
+                            onClick={() =>
+                              void window.api.files.revealArchived(
+                                name,
+                                file.category,
+                                file.path
+                              )
+                            }
+                            className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                          >
+                            <FolderIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            title="删除到回收站"
+                            data-action="archived-delete"
+                            onClick={() => void trashArchivedItem(file)}
+                            className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ) : (
               <>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -513,6 +654,15 @@ export default function ProjectDetail({ name, onBack }: Props) {
                             <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                               <button
                                 type="button"
+                                title="归档目录"
+                                data-action="folder-archive"
+                                onClick={() => void archiveFolderItem(folder)}
+                                className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                              >
+                                <ArchiveIcon className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
                                 title="重命名目录"
                                 data-action="folder-rename"
                                 onClick={() => startFolderRename(folder)}
@@ -588,6 +738,15 @@ export default function ProjectDetail({ name, onBack }: Props) {
                               className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
                             >
                               <FolderIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="归档"
+                              data-action="file-archive"
+                              onClick={() => void archiveItem(file)}
+                              className="grid h-6 w-6 place-items-center rounded text-muted/70 transition-colors hover:bg-paper hover:text-ink"
+                            >
+                              <ArchiveIcon className="h-3.5 w-3.5" />
                             </button>
                             <button
                               type="button"
