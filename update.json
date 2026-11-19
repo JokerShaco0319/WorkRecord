@@ -4,8 +4,8 @@
   "notes": "### 变更\n- 国内更新源由 Gitee 调整为 GitCode，Gitee 后续不再发布新版本\n- 安装包体积优化：精简语言包、移除重复依赖与 `dxcompiler.dll`，安装版约 101 MiB、便携版约 92 MiB\n\n### 修复\n- 设置页的更新源选项与说明同步调整",
   "downloads": {
     "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe",
-    "gitcode": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe",
-    "gitee": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe",
-    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe"
+    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe",
+    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe",
+    "gitee": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.2.1/WorkRecord-Setup-0.2.1.exe"
   }
 }
