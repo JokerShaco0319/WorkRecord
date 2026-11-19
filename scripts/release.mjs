@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,10 +21,20 @@ const tag = `v${pkg.version}`
 const githubUrl = `https://github.com/${repo.github.owner}/${repo.github.repo}/releases/download/${tag}/${setup}`
 const gitcodeUrl = `https://gitcode.com/${repo.gitcode.owner}/${repo.gitcode.repo}/releases/download/${tag}/${setup}`
 
+let sha256 = null
+try {
+  sha256 = createHash('sha256')
+    .update(await readFile(resolve(root, 'release', setup)))
+    .digest('hex')
+} catch {
+  console.warn(`未找到 release/${setup}，清单将不包含 sha256`)
+}
+
 const manifest = {
   version: pkg.version,
   date: release.date,
   notes: release.notes,
+  ...(sha256 ? { sha256 } : {}),
   downloads: {
     github: githubUrl,
     gitcode: gitcodeUrl,

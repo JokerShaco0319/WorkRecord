@@ -2,7 +2,7 @@ import type { DayDoc, EntryInput, EntryTarget } from './md/month'
 import type { ProjectStatus } from './md/project'
 import type { Quadrant, TodoDoc, TodoInput, TodoTarget } from './md/todo'
 import type { ArchiveItem, ArchiveTarget } from './md/todoArchive'
-import type { UpdateBootstrap, UpdateCheckResult, UpdateSource } from './update'
+import type { UpdateBootstrap, UpdateCheckResult, UpdateProgress, UpdateSource } from './update'
 
 export interface VaultInfo {
   path: string | null
@@ -219,6 +219,13 @@ export interface WorkRecordApi {
     check(manual?: boolean): Promise<UpdateCheckResult>
     dismiss(version: string): Promise<void>
     open(url: string): Promise<void>
+    download(url: string, sha256: string | null): Promise<{ path: string; size: number }>
+    install(filePath: string): Promise<void>
+    cancel(): Promise<void>
+    onProgress(listener: (progress: UpdateProgress) => void): () => void
+  }
+  shortcut: {
+    createStartMenu(): Promise<string>
   }
   clipboard: {
     write(text: string): Promise<void>

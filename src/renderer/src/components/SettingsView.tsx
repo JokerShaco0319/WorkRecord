@@ -31,6 +31,7 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
   const [updateSource, setUpdateSource] = useState<UpdateSource>('auto')
   const [backups, setBackups] = useState<BackupInfo[] | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [shortcutNotice, setShortcutNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -118,6 +119,17 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
     }
   }
 
+  async function createShortcut(): Promise<void> {
+    try {
+      await window.api.shortcut.createStartMenu()
+      setShortcutNotice('已创建开始菜单快捷方式，可在开始菜单中固定到「开始」屏幕')
+      setError(null)
+    } catch (err) {
+      setShortcutNotice(null)
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const updateStatus = updater.checking
     ? '正在检查…'
     : updater.result?.hasUpdate
@@ -197,6 +209,27 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
                 启用
               </label>
             </div>
+
+            <div className="mt-3 flex items-center justify-between gap-4 border-t border-line/60 pt-3">
+              <div>
+                <div className="text-[12px] text-muted">开始菜单快捷方式</div>
+                <div className="mt-0.5 text-[11px] text-muted/60">
+                  创建后可从开始菜单固定，使用应用图标启动
+                </div>
+              </div>
+              <button
+                type="button"
+                data-action="create-shortcut"
+                onClick={() => void createShortcut()}
+                className="h-7 shrink-0 rounded-md border border-line bg-paper px-2.5 text-[11px] text-muted transition-colors hover:text-ink"
+              >
+                创建快捷方式
+              </button>
+            </div>
+
+            {shortcutNotice && (
+              <p className="mt-2 text-[11px] text-accent">{shortcutNotice}</p>
+            )}
           </section>
 
           <section className="rounded-xl border border-line bg-surface px-5 py-4">

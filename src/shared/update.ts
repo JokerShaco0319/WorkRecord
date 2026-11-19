@@ -8,6 +8,13 @@ export interface UpdateManifest {
   date?: string
   notes?: string
   downloads?: Record<string, string>
+  sha256?: string
+}
+
+export interface UpdateProgress {
+  received: number
+  total: number
+  percent: number
 }
 
 export interface UpdateCheckResult {
@@ -20,12 +27,14 @@ export interface UpdateCheckResult {
   source: UpdateChannel | null
   downloadUrl: string | null
   releasePage: string | null
+  sha256: string | null
   checkedAt: string | null
   error: string | null
 }
 
 export interface UpdateBootstrap {
   currentVersion: string
+  portable: boolean
   notes: Array<{ version: string; date: string; notes: string }>
 }
 
@@ -113,6 +122,11 @@ export function parseManifest(input: unknown): UpdateManifest | null {
       ? record.date
       : undefined
 
+  const sha256 =
+    typeof record.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(record.sha256)
+      ? record.sha256.toLowerCase()
+      : undefined
+
   let downloads: Record<string, string> | undefined
   if (record.downloads && typeof record.downloads === 'object') {
     downloads = {}
@@ -122,5 +136,5 @@ export function parseManifest(input: unknown): UpdateManifest | null {
     }
   }
 
-  return { version, notes, date, downloads }
+  return { version, notes, date, downloads, sha256 }
 }

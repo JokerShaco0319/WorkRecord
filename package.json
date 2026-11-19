@@ -1,7 +1,7 @@
 {
   "name": "workrecord",
   "productName": "WorkRecord",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "本地 Markdown 工作记录与待办",
   "author": "WorkRecord",
   "main": "./out/main/index.js",
@@ -44,6 +44,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WorkRecord",
       "artifactName": "WorkRecord-Setup-${version}.${ext}"
     },
     "portable": {

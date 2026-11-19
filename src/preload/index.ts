@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { WorkRecordApi } from '@shared/api'
+import type { UpdateProgress } from '@shared/update'
 
 const api: WorkRecordApi = {
   vault: {
@@ -84,7 +85,21 @@ const api: WorkRecordApi = {
     bootstrap: () => ipcRenderer.invoke('update:bootstrap'),
     check: (manual) => ipcRenderer.invoke('update:check', Boolean(manual)),
     dismiss: (version) => ipcRenderer.invoke('update:dismiss', version),
-    open: (url) => ipcRenderer.invoke('update:open', url)
+    open: (url) => ipcRenderer.invoke('update:open', url),
+    download: (url, sha256) => ipcRenderer.invoke('update:download', url, sha256),
+    install: (filePath) => ipcRenderer.invoke('update:install', filePath),
+    cancel: () => ipcRenderer.invoke('update:cancel'),
+    onProgress: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: UpdateProgress): void =>
+        listener(progress)
+      ipcRenderer.on('update:progress', handler)
+      return () => {
+        ipcRenderer.removeListener('update:progress', handler)
+      }
+    }
+  },
+  shortcut: {
+    createStartMenu: () => ipcRenderer.invoke('shortcut:create-start-menu')
   },
   clipboard: {
     write: (text) => ipcRenderer.invoke('clipboard:write', text)

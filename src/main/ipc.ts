@@ -73,11 +73,15 @@ import { computeStats, monthsBetween } from './stats'
 import { appendCompleted, listArchive, removeArchived } from './todoArchive'
 import {
   bootstrapUpdate,
+  cancelDownload,
   checkForUpdate,
   dismissVersion,
+  downloadUpdate,
+  installUpdate,
   invalidateUpdateCache,
   openUpdateUrl
 } from './update'
+import { createStartMenuShortcut } from './shortcut'
 import type { AppConfig } from './vault'
 import {
   initializeVault,
@@ -712,6 +716,22 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('update:open', async (_event, url: string): Promise<void> => {
     await openUpdateUrl(url)
   })
+
+  ipcMain.handle(
+    'update:download',
+    (_event, url: string, sha256: string | null) =>
+      downloadUpdate(url, sha256, (progress) => {
+        getWindow()?.webContents.send('update:progress', progress)
+      })
+  )
+
+  ipcMain.handle('update:install', (_event, filePath: string) => installUpdate(filePath))
+
+  ipcMain.handle('update:cancel', (): void => {
+    cancelDownload()
+  })
+
+  ipcMain.handle('shortcut:create-start-menu', () => createStartMenuShortcut())
 
   ipcMain.handle('clipboard:write', async (_event, text: string): Promise<void> => {
     await clipboard.writeText(text)
