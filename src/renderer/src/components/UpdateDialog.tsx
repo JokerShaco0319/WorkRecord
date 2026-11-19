@@ -5,7 +5,7 @@ import MarkdownPreview from './MarkdownPreview'
 
 const SOURCE_LABEL: Record<string, string> = {
   github: 'GitHub',
-  gitee: 'Gitee'
+  gitcode: 'GitCode'
 }
 
 function Modal({

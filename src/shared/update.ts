@@ -1,6 +1,6 @@
 import repoConfig from './update-repo.json'
 
-export type UpdateChannel = 'github' | 'gitee'
+export type UpdateChannel = 'github' | 'gitcode'
 export type UpdateSource = 'auto' | UpdateChannel
 
 export interface UpdateManifest {
@@ -30,7 +30,7 @@ export interface UpdateBootstrap {
 }
 
 /**
- * 发布仓库地址：GitHub 与 Gitee 账号不同，分别配置。
+ * 发布仓库地址：GitHub 与 GitCode 分别配置。
  * 修改后需要重新构建，因为地址会编进应用。
  */
 export const UPDATE_CHANNELS: Record<UpdateChannel, { manifest: string; releases: string }> = {
@@ -38,9 +38,9 @@ export const UPDATE_CHANNELS: Record<UpdateChannel, { manifest: string; releases
     manifest: `https://raw.githubusercontent.com/${repoConfig.github.owner}/${repoConfig.github.repo}/${repoConfig.github.branch}/update.json`,
     releases: `https://github.com/${repoConfig.github.owner}/${repoConfig.github.repo}/releases/latest`
   },
-  gitee: {
-    manifest: `https://gitee.com/${repoConfig.gitee.owner}/${repoConfig.gitee.repo}/raw/${repoConfig.gitee.branch}/update.json`,
-    releases: `https://gitee.com/${repoConfig.gitee.owner}/${repoConfig.gitee.repo}/releases`
+  gitcode: {
+    manifest: `https://api.gitcode.com/api/v5/repos/${repoConfig.gitcode.owner}/${repoConfig.gitcode.repo}/raw/update.json?ref=${repoConfig.gitcode.branch}`,
+    releases: `https://gitcode.com/${repoConfig.gitcode.owner}/${repoConfig.gitcode.repo}/releases`
   }
 }
 

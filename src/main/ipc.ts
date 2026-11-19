@@ -690,7 +690,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(
     'settings:set-update-preference',
     async (_event, enabled: boolean, source: UpdateSource): Promise<AppSettings> => {
-      if (source !== 'auto' && source !== 'github' && source !== 'gitee') {
+      if (source !== 'auto' && source !== 'github' && source !== 'gitcode') {
         throw new Error(`非法的更新源：${source}`)
       }
       invalidateUpdateCache()

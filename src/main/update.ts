@@ -98,7 +98,7 @@ export async function openUpdateUrl(url: string): Promise<void> {
 
 async function runCheck(source: UpdateSource, current: string): Promise<UpdateCheckResult> {
   const checkedAt = new Date().toISOString()
-  const channels: UpdateChannel[] = source === 'auto' ? ['gitee', 'github'] : [source]
+  const channels: UpdateChannel[] = source === 'auto' ? ['gitcode', 'github'] : [source]
 
   const settled = await Promise.allSettled(channels.map((channel) => fetchManifest(channel)))
   const found: Array<{ channel: UpdateChannel; manifest: UpdateManifest }> = []
@@ -112,11 +112,11 @@ async function runCheck(source: UpdateSource, current: string): Promise<UpdateCh
     return emptyResult(current, '无法连接更新服务器，请检查网络后重试', checkedAt)
   }
 
-  // 两个源版本相同时优先用 Gitee（国内访问更稳定）
+  // 两个源版本相同时优先用 GitCode（国内访问更稳定）
   found.sort(
     (left, right) =>
       compareVersions(right.manifest.version, left.manifest.version) ||
-      (left.channel === 'gitee' ? -1 : 1)
+      (left.channel === 'gitcode' ? -1 : 1)
   )
   const best = found[0]
   const config = await readAppConfig()

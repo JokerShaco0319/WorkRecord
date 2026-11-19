@@ -325,7 +325,7 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
                   </span>
                 </div>
                 <div className="mt-0.5 text-[11px] text-muted/60">
-                  从 GitHub / Gitee 读取公开的版本清单，不会上传本地数据
+                  从 GitHub / GitCode 读取公开的版本清单，不会上传本地数据
                 </div>
               </div>
               <button
@@ -358,8 +358,8 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
                 }
                 className="h-7 rounded border border-line bg-paper px-2 text-[11px] text-muted outline-none focus:border-accent/50"
               >
-                <option value="auto">自动（Gitee 优先）</option>
-                <option value="gitee">仅 Gitee</option>
+                <option value="auto">自动（GitCode 优先）</option>
+                <option value="gitcode">仅 GitCode</option>
                 <option value="github">仅 GitHub</option>
               </select>
             </div>
