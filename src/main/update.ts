@@ -1,10 +1,12 @@
 import { app, net, shell } from 'electron'
+import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createWriteStream, existsSync } from 'node:fs'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { promisify } from 'node:util'
 import { notesBetween, type ReleaseNote } from '@shared/changelog'
 import {
   UPDATE_CHANNELS,
@@ -192,7 +194,9 @@ export function cancelDownload(): void {
   downloadController?.abort()
 }
 
-/** 启动已下载的安装程序；安装器接管后退出应用。 */
+const run = promisify(execFile)
+
+/** 先退出应用，再由独立进程启动安装程序，避免 NSIS 检测到应用仍在运行。 */
 export async function installUpdate(filePath: string): Promise<void> {
   const dir = resolve(updatesDir())
   const target = resolve(filePath)
@@ -200,9 +204,15 @@ export async function installUpdate(filePath: string): Promise<void> {
     throw new Error('更新包路径不合法')
   }
 
-  const error = await shell.openPath(target)
-  if (error) throw new Error(error)
-  setTimeout(() => app.quit(), 800)
+  const escaped = target.replace(/'/g, "''")
+  const inner = `powershell.exe -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Milliseconds 2000; Start-Process -FilePath '${escaped}'"`
+  const outer = `Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '${inner.replace(/'/g, "''")}' } | Out-Null`
+
+  // 通过 WMI 启动，进程不在 Electron 的 job 对象里，主进程退出后仍能运行
+  await run('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', outer], {
+    windowsHide: true
+  })
+  setTimeout(() => app.exit(0), 100)
 }
 
 async function runCheck(source: UpdateSource, current: string): Promise<UpdateCheckResult> {
