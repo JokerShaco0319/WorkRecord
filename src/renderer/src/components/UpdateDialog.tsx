@@ -77,10 +77,11 @@ export function UpdateDialog({
   onInstall,
   onOpenPage
 }: UpdateDialogProps) {
+  const downloadSource = result.downloadSource ?? result.source
   const meta = [
     `当前版本 v${result.currentVersion}`,
     result.date ? `发布于 ${result.date}` : null,
-    result.source ? `来源 ${SOURCE_LABEL[result.source] ?? result.source}` : null
+    downloadSource ? `下载源 ${SOURCE_LABEL[downloadSource] ?? downloadSource}` : null
   ]
     .filter(Boolean)
     .join(' · ')

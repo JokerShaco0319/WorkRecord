@@ -26,6 +26,7 @@ export interface UpdateCheckResult {
   date: string | null
   source: UpdateChannel | null
   downloadUrl: string | null
+  downloadSource: UpdateChannel | null
   releasePage: string | null
   sha256: string | null
   checkedAt: string | null
@@ -57,6 +58,7 @@ const ALLOWED_DOWNLOAD_HOSTS = [
   'github.com',
   'objects.githubusercontent.com',
   'release-assets.githubusercontent.com',
+  'gitcode.com',
   'gitee.com',
   'gitee.io'
 ]

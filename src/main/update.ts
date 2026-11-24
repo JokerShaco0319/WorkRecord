@@ -24,6 +24,7 @@ import { resolveDataPaths } from './dataPaths'
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 8000
+const PROBE_TIMEOUT_MS = 6000
 const MAX_MANIFEST_LENGTH = 200_000
 
 let cached: { source: UpdateSource; result: UpdateCheckResult } | null = null
@@ -239,17 +240,20 @@ async function runCheck(source: UpdateSource, current: string): Promise<UpdateCh
   )
   const best = found[0]
   const config = await readAppConfig()
-  const downloadable = pickDownload(best.manifest, best.channel)
+  const hasUpdate = compareVersions(best.manifest.version, current) > 0
+  const candidates = downloadCandidates(best.manifest, source)
+  const chosen = hasUpdate ? await firstReachable(candidates) : (candidates[0] ?? null)
 
   return {
     currentVersion: current,
     latestVersion: best.manifest.version,
-    hasUpdate: compareVersions(best.manifest.version, current) > 0,
+    hasUpdate,
     skipped: config.skippedVersion === best.manifest.version,
     notes: best.manifest.notes ?? null,
     date: best.manifest.date ?? null,
     source: best.channel,
-    downloadUrl: downloadable,
+    downloadUrl: chosen?.url ?? null,
+    downloadSource: chosen?.channel ?? null,
     releasePage: UPDATE_CHANNELS[best.channel].releases,
     sha256: best.manifest.sha256 ?? null,
     checkedAt,
@@ -282,12 +286,76 @@ async function fetchManifest(channel: UpdateChannel): Promise<UpdateManifest | n
   }
 }
 
-function pickDownload(manifest: UpdateManifest, channel: UpdateChannel): string | null {
-  const candidates = [manifest.downloads?.[channel], manifest.downloads?.default]
-  for (const url of candidates) {
-    if (url && isAllowedDownloadUrl(url)) return url
+interface DownloadCandidate {
+  channel: UpdateChannel
+  url: string
+}
+
+/**
+ * 下载地址排序：自动模式先 GitCode（国内更稳定），探测不通再回退 GitHub；
+ * 用户在设置里指定的单一源只使用该源的地址。
+ */
+function downloadCandidates(
+  manifest: UpdateManifest,
+  source: UpdateSource
+): DownloadCandidate[] {
+  const keys: Array<{ key: string; channel: UpdateChannel | null }> =
+    source === 'auto'
+      ? [
+          { key: 'gitcode', channel: 'gitcode' },
+          { key: 'github', channel: 'github' },
+          { key: 'default', channel: null }
+        ]
+      : [{ key: source, channel: source }]
+
+  const candidates: DownloadCandidate[] = []
+  for (const { key, channel } of keys) {
+    const url = manifest.downloads?.[key]
+    if (!url || !isAllowedDownloadUrl(url)) continue
+    if (candidates.some((item) => item.url === url)) continue
+    candidates.push({ channel: channel ?? channelOfUrl(url), url })
   }
-  return null
+  return candidates
+}
+
+function channelOfUrl(url: string): UpdateChannel {
+  return new URL(url).hostname.endsWith('gitcode.com') ? 'gitcode' : 'github'
+}
+
+/** 逐个试探候选地址，返回第一个可用的；全部失败时仍返回首个，交由下载时报错。 */
+async function firstReachable(
+  candidates: DownloadCandidate[]
+): Promise<DownloadCandidate | null> {
+  for (const candidate of candidates) {
+    if (await canDownload(candidate.url)) return candidate
+  }
+  return candidates[0] ?? null
+}
+
+/**
+ * GitCode 的下载链接会重定向到 CDN，且 HEAD 请求被网关拦截，
+ * 因此用 Range GET 只取 1 字节来判断文件是否存在。
+ */
+async function canDownload(url: string): Promise<boolean> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+
+  try {
+    const response = await net.fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Range: 'bytes=0-0',
+        'User-Agent': `WorkRecord/${currentVersion()}`
+      }
+    })
+    const ok = response.ok
+    await response.body?.cancel().catch(() => {})
+    return ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function emptyResult(
@@ -304,6 +372,7 @@ function emptyResult(
     date: null,
     source: null,
     downloadUrl: null,
+    downloadSource: null,
     releasePage: null,
     sha256: null,
     checkedAt,

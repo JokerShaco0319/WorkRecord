@@ -391,7 +391,7 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
                 }
                 className="h-7 rounded border border-line bg-paper px-2 text-[11px] text-muted outline-none focus:border-accent/50"
               >
-                <option value="auto">自动（GitCode 优先）</option>
+                <option value="auto">自动（GitCode 优先，失败回退 GitHub）</option>
                 <option value="gitcode">仅 GitCode</option>
                 <option value="github">仅 GitHub</option>
               </select>

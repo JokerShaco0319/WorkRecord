@@ -63,9 +63,12 @@ describe('更新清单', () => {
 
   it('只接受 https 的可信域名', () => {
     expect(isAllowedDownloadUrl('https://github.com/a/b')).toBe(true)
+    expect(isAllowedDownloadUrl('https://gitcode.com/a/b')).toBe(true)
+    expect(isAllowedDownloadUrl('https://file-cdn.gitcode.com/a/b.exe')).toBe(true)
     expect(isAllowedDownloadUrl('https://gitee.com/a/b')).toBe(true)
     expect(isAllowedDownloadUrl('http://github.com/a/b')).toBe(false)
     expect(isAllowedDownloadUrl('https://evil.example.com/a.exe')).toBe(false)
+    expect(isAllowedDownloadUrl('https://notgitcode.com/a.exe')).toBe(false)
     expect(isAllowedDownloadUrl('not a url')).toBe(false)
   })
 })
