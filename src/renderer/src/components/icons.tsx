@@ -46,6 +46,15 @@ export function ChartIcon({ className }: IconProps) {
   )
 }
 
+export function ReportIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <rect x="3" y="2" width="10" height="12" rx="1.6" />
+      <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+    </svg>
+  )
+}
+
 export function ChevronLeftIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

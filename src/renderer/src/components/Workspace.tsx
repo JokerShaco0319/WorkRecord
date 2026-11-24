@@ -6,6 +6,7 @@ import {
   CheckSquareIcon,
   FolderIcon,
   GearIcon,
+  ReportIcon,
   SearchIcon,
   TimerIcon
 } from './icons'
@@ -17,8 +18,9 @@ import StatsView from './StatsView'
 import TodoView from './TodoView'
 
 const WeeklyView = lazy(() => import('./WeeklyView'))
+const MonthlyView = lazy(() => import('./MonthlyView'))
 
-type View = 'day' | 'todo' | 'projects' | 'weekly' | 'stats' | 'settings'
+type View = 'day' | 'todo' | 'projects' | 'weekly' | 'month' | 'stats' | 'settings'
 
 interface NavItemProps {
   icon: ReactNode
@@ -167,6 +169,13 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
             }}
           />
           <NavItem
+            icon={<ReportIcon className="h-4 w-4" />}
+            label="月报"
+            active={view === 'month'}
+            dataAction="nav-month"
+            onClick={() => setView('month')}
+          />
+          <NavItem
             icon={<TimerIcon className="h-4 w-4" />}
             label="统计"
             active={view === 'stats'}
@@ -208,6 +217,11 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
         {view === 'weekly' && (
           <Suspense fallback={<div className="p-10 text-[12px] text-muted">正在加载周报…</div>}>
             <WeeklyView key={weekSeed?.nonce ?? 'week'} initialWeek={weekSeed?.week} />
+          </Suspense>
+        )}
+        {view === 'month' && (
+          <Suspense fallback={<div className="p-10 text-[12px] text-muted">正在加载月报…</div>}>
+            <MonthlyView />
           </Suspense>
         )}
         {view === 'stats' && <StatsView />}

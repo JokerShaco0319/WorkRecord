@@ -52,3 +52,10 @@ export function monthKeyForDate(key: string): string {
 export function formatMonthDay(key: string): string {
   return key.slice(5)
 }
+
+/** 'YYYY-MM' 加减若干个月 */
+export function addMonthsToMonthKey(month: string, delta: number): string {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const date = new Date(year, monthNumber - 1 + delta, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}

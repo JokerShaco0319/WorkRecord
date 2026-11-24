@@ -1,8 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { DailyEntry, DayDoc, EntryInput } from '@shared/md/month'
+import { buildDailyReport } from '@shared/md/report'
 import { addDaysKey, formatDateKey, formatTimeHm, monthKeyForDate, parseDateKey, weekdayCn } from '@shared/date'
 import CalendarPanel from './CalendarPanel'
 import EntryRow from './EntryRow'
+import ExportDialog from './ExportDialog'
 import SmartInput from './SmartInput'
 import UndoToast from './UndoToast'
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from './icons'
@@ -28,6 +30,7 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
   })
   const [previousEntries, setPreviousEntries] = useState<DailyEntry[]>([])
   const [pendingDelete, setPendingDelete] = useState<DailyEntry | null>(null)
+  const [exportText, setExportText] = useState<string | null>(null)
 
   const previousSelected = useRef(selected)
   const date = parseDateKey(selected)
@@ -184,6 +187,11 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
     [selected]
   )
 
+  function openExport(): void {
+    if (!doc || doc.entries.length === 0) return
+    setExportText(buildDailyReport(selected, doc.entries))
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 px-10 pb-6 pt-10">
@@ -253,6 +261,16 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
                   </>
                 )}
               </div>
+
+              <button
+                type="button"
+                data-action="daily-export"
+                onClick={openExport}
+                disabled={!doc || doc.entries.length === 0}
+                className="ml-2 h-7 rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink disabled:opacity-50"
+              >
+                导出
+              </button>
 
               <div className="ml-2 flex rounded-lg border border-line bg-paper p-0.5">
                 {(
@@ -363,6 +381,14 @@ export default function DayView({ initialDate }: { initialDate?: string }) {
           message="已删除 1 条记录"
           onUndo={() => void undoDelete()}
           onDismiss={dismissUndo}
+        />
+      )}
+
+      {exportText !== null && (
+        <ExportDialog
+          title="导出日报"
+          initialText={exportText}
+          onClose={() => setExportText(null)}
         />
       )}
     </div>
