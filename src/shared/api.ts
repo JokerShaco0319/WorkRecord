@@ -83,7 +83,16 @@ export type SearchHit =
   | { kind: 'entry'; date: string; time: string | null; project: string | null; content: string }
   | { kind: 'todo'; quadrant: Quadrant; content: string; done: boolean }
   | { kind: 'weekly'; week: string; text: string }
-  | { kind: 'project-file'; project: string; category: string; name: string }
+  | {
+      kind: 'project-file'
+      project: string
+      category: string
+      name: string
+      /** 分类内的相对路径，嵌套目录时包含目录名 */
+      path: string
+      match: 'name' | 'content'
+      snippet?: string
+    }
 
 export interface AppSettings {
   theme: 'light' | 'dark'

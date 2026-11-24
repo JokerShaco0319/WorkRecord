@@ -3,6 +3,7 @@ import { basename, join } from 'node:path'
 import type { SearchHit } from '@shared/api'
 import { parseMonth } from '@shared/md/month'
 import { parseTodo } from '@shared/md/todo'
+import { FileIndex, fileIndex } from './fileIndex'
 
 interface WalkedFile {
   abs: string
@@ -39,10 +40,13 @@ export async function listMarkdown(root: string): Promise<WalkedFile[]> {
 export async function searchVault(
   vaultPath: string,
   query: string,
-  limit = 60
+  limit = 60,
+  index: FileIndex = fileIndex
 ): Promise<SearchHit[]> {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
+
+  index.setVault(vaultPath)
 
   const hits: SearchHit[] = []
 
@@ -94,12 +98,16 @@ export async function searchVault(
     }
   }
 
-  for (const file of await listMarkdown(join(vaultPath, 'projects'))) {
-    const parts = file.rel.split('/')
-    if (parts.length < 3) continue
-    const name = parts[parts.length - 1]
-    if (!name.toLowerCase().includes(needle)) continue
-    hits.push({ kind: 'project-file', project: parts[0], category: parts[1], name })
+  for (const hit of await index.search(needle)) {
+    hits.push({
+      kind: 'project-file',
+      project: hit.project,
+      category: hit.category,
+      name: hit.name,
+      path: hit.path,
+      match: hit.match,
+      snippet: hit.snippet
+    })
   }
 
   hits.sort((a, b) => {

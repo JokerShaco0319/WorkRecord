@@ -23,7 +23,13 @@ function describe(hit: SearchHit): { title: string; meta: string } {
     case 'weekly':
       return { title: hit.text, meta: `周报 ${hit.week}` }
     case 'project-file':
-      return { title: hit.name, meta: `${hit.project} / ${hit.category}` }
+      return {
+        title: hit.name,
+        meta:
+          hit.match === 'content'
+            ? `内容匹配 · ${hit.project} / ${hit.category}`
+            : `${hit.project} / ${hit.category}`
+      }
   }
 }
 
@@ -117,17 +123,27 @@ export default function SearchOverlay({ onClose, onOpen }: Props) {
                   type="button"
                   onMouseEnter={() => setActive(index)}
                   onClick={() => onOpen(hit)}
-                  className={`flex w-full items-baseline gap-3 px-4 py-2 text-left transition-colors ${
+                  className={`flex w-full items-start gap-3 px-4 py-2 text-left transition-colors ${
                     index === active ? 'bg-paper' : ''
                   }`}
                 >
-                  <span className="min-w-0 flex-1 truncate text-[13px]">{title}</span>
-                  <span className="shrink-0 text-[11px] text-muted/70">{meta}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px]">{title}</span>
+                    {hit.kind === 'project-file' && hit.snippet && (
+                      <span className="mt-0.5 block truncate text-[11px] text-muted/70">
+                        {hit.snippet}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 pt-px text-[11px] text-muted/70">{meta}</span>
                 </button>
               </li>
             )
           })}
 
+          {loading && hits.length === 0 && (
+            <li className="px-4 py-6 text-center text-[12px] text-muted/70">正在搜索…</li>
+          )}
           {!loading && query.trim() && hits.length === 0 && (
             <li className="px-4 py-6 text-center text-[12px] text-muted/70">没有找到匹配内容</li>
           )}

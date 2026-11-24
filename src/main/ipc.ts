@@ -68,6 +68,7 @@ import {
 } from './archive'
 import { listAssets, removeAsset, saveAsset } from './assets'
 import { closeCapture, resizeCapture } from './capture'
+import { fileIndex } from './fileIndex'
 import { listTags, searchVault } from './search'
 import {
   isConfigured,
@@ -208,6 +209,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const vaultPath = result.filePaths[0]
     await initializeVault(vaultPath)
     await updateAppConfig({ vaultPath })
+    fileIndex.setVault(vaultPath)
     return { path: vaultPath }
   })
 

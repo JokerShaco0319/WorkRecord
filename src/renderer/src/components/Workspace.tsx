@@ -102,7 +102,7 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
       setWeekSeed({ week: hit.week, nonce: Date.now() })
       setView('weekly')
     } else {
-      void window.api.files.open(hit.project, hit.category, hit.name)
+      void window.api.files.open(hit.project, hit.category, hit.path)
     }
   }
 

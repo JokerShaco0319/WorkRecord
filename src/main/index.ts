@@ -7,6 +7,7 @@ import windowIcon from '../../resources/icon.png?asset'
 import trayIcon from '../../resources/tray.png?asset'
 import { openCapture } from './capture'
 import { resolveDataPaths } from './dataPaths'
+import { fileIndex } from './fileIndex'
 import { registerIpc } from './ipc'
 import { notifyBackupReminder, notifyDueTodos } from './reminders'
 import { migrateCompletedTodos } from './todoArchive'
@@ -236,6 +237,7 @@ app.whenReady().then(() => {
       createWindow()
 
       if (!config.vaultPath) return
+      fileIndex.setVault(config.vaultPath)
       const today = formatDateKey(new Date())
       await migrateCompletedTodos(config.vaultPath, today)
       await notifyDueTodos(config.vaultPath, today, showMainWindow).catch(() => false)
