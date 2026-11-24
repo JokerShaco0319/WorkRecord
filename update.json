@@ -1,11 +1,11 @@
 {
-  "version": "0.3.6",
+  "version": "0.4.0",
   "date": "2026-11-24",
-  "notes": "### 新增\n- 全局搜索支持项目文件：文件名覆盖所有类型，文本文件可搜索正文并显示命中片段\n- 项目文件索引在后台自动维护，文件变化后增量刷新；二进制文档暂只按文件名搜索\n\n### 修复\n- 搜索结果中的项目文件可以正确打开嵌套目录下的文件",
-  "sha256": "cdb92ffa6b67ebacc121885cce307dce0f110cd1a8a7554d68894592d6d6f307",
+  "notes": "### 新增\n- 左侧导航宽度、源码编辑/预览分栏支持拖拽调整，双击恢复默认，重启后保留\n\n### 优化\n- 页面布局适配常见分辨率：窄窗口自动收紧页边距、堆叠头部操作区并降低网格列数\n- 窗口宽度小于 1024px 时左侧导航自动收成图标栏，变宽后恢复原宽度\n- Markdown 表格和图片限制在内容区内，窄窗口下可横向滚动\n- 窗口最小尺寸调整为 820×560",
+  "sha256": "05e7ae9ca97893d0474bab6c3f255ec341f35246cf652e7417779c3ce5874dd6",
   "downloads": {
-    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.6/WorkRecord-Setup-0.3.6.exe",
-    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.6/WorkRecord-Setup-0.3.6.exe",
-    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.6/WorkRecord-Setup-0.3.6.exe"
+    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.4.0/WorkRecord-Setup-0.4.0.exe",
+    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.4.0/WorkRecord-Setup-0.4.0.exe",
+    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.4.0/WorkRecord-Setup-0.4.0.exe"
   }
 }
