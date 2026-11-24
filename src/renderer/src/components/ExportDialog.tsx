@@ -67,7 +67,7 @@ export default function ExportDialog({ title, initialText, onClose }: Props) {
           value={text}
           onChange={(event) => setText(event.target.value)}
           spellCheck={false}
-          className="min-h-[300px] flex-1 resize-none bg-surface px-6 py-4 font-mono text-[12.5px] leading-6 text-ink outline-none"
+          className="min-h-[180px] flex-1 resize-none bg-surface px-6 py-4 font-mono text-[12.5px] leading-6 text-ink outline-none lg:min-h-[300px]"
         />
 
         <div className="flex items-center justify-end gap-2 border-t border-line px-6 py-3">

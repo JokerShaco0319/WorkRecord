@@ -108,8 +108,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1240,
     height: 820,
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: 820,
+    minHeight: 560,
     show: !startHidden,
     title: 'WorkRecord',
     icon: windowIcon,

@@ -142,7 +142,7 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-10 pb-6 pt-10">
+      <div className="shrink-0 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8 lg:px-10 lg:pb-6 lg:pt-10">
         <div className="mx-auto w-full max-w-[820px]">
           <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
             Settings
@@ -157,7 +157,7 @@ export default function SettingsView({ vaultPath, theme, onToggleTheme }: Props)
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 sm:pb-12 lg:px-10 lg:pb-14">
         <div className="mx-auto w-full max-w-[820px] space-y-4">
           <section className="rounded-xl border border-line bg-surface px-5 py-4">
             <h2 className="text-[13px] font-medium">外观</h2>

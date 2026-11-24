@@ -2,6 +2,7 @@ import type { DayDoc, EntryInput, EntryTarget } from './md/month'
 import type { ProjectStatus } from './md/project'
 import type { Quadrant, TodoDoc, TodoInput, TodoTarget } from './md/todo'
 import type { ArchiveItem, ArchiveTarget } from './md/todoArchive'
+import type { UiLayout } from './layout'
 import type { UpdateBootstrap, UpdateCheckResult, UpdateProgress, UpdateSource } from './update'
 
 export interface VaultInfo {
@@ -102,6 +103,7 @@ export interface AppSettings {
   backupReminderTime: string
   updateCheckEnabled: boolean
   updateSource: UpdateSource
+  uiLayout: UiLayout
 }
 
 export interface AssetField {
@@ -251,6 +253,7 @@ export interface WorkRecordApi {
     setLaunchAtLogin(enabled: boolean): Promise<AppSettings>
     setBackupReminder(enabled: boolean, time: string): Promise<AppSettings>
     setUpdatePreference(enabled: boolean, source: UpdateSource): Promise<AppSettings>
+    setUiLayout(patch: Partial<UiLayout>): Promise<AppSettings>
   }
   update: {
     bootstrap(): Promise<UpdateBootstrap>

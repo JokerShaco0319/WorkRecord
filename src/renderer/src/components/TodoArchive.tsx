@@ -45,7 +45,7 @@ export default function TodoArchive({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-10 pb-5 pt-10">
+      <div className="shrink-0 px-4 pb-4 pt-6 sm:px-6 sm:pb-4 sm:pt-8 lg:px-10 lg:pb-5 lg:pt-10">
         <div className="mx-auto w-full max-w-[980px]">
           <button
             type="button"
@@ -57,7 +57,7 @@ export default function TodoArchive({ onBack }: { onBack: () => void }) {
             返回待办
           </button>
 
-          <div className="mt-2 flex items-end justify-between gap-6">
+          <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
                 Archive
@@ -70,7 +70,7 @@ export default function TodoArchive({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-1 pb-1">
+            <div className="flex flex-wrap items-center gap-1 pb-1">
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
@@ -98,7 +98,7 @@ export default function TodoArchive({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 sm:pb-12 lg:px-10 lg:pb-14">
         <div className="mx-auto w-full max-w-[980px]">
           {items && items.length > 0 ? (
             <ul className="space-y-0.5">

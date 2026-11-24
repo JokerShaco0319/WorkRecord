@@ -505,9 +505,9 @@ export default function AssetsPanel({ project }: { project: string }) {
                         key={field.id}
                         onDoubleClick={() => void copy(field.value, field.id)}
                         title="双击复制该字段"
-                        className="flex items-center gap-2 text-[12px]"
+                        className="flex flex-col gap-0.5 text-[12px] sm:flex-row sm:items-center sm:gap-2"
                       >
-                        <dt className="w-16 shrink-0 truncate text-muted">
+                        <dt className="shrink-0 truncate text-muted sm:w-16">
                           {field.label || '未命名字段'}
                         </dt>
                         <dd className="min-w-0 flex-1 truncate font-mono">

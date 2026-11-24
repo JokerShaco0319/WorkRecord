@@ -77,7 +77,7 @@ export default function SearchOverlay({ onClose, onOpen }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/25 px-4 pt-[12vh]"
+      className="fixed inset-0 z-50 bg-black/25 px-4 pt-[8vh] sm:pt-[12vh]"
       onMouseDown={onClose}
       data-action="search-overlay"
     >

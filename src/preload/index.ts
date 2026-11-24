@@ -91,7 +91,8 @@ const api: WorkRecordApi = {
     setBackupReminder: (enabled, time) =>
       ipcRenderer.invoke('settings:set-backup-reminder', enabled, time),
     setUpdatePreference: (enabled, source) =>
-      ipcRenderer.invoke('settings:set-update-preference', enabled, source)
+      ipcRenderer.invoke('settings:set-update-preference', enabled, source),
+    setUiLayout: (patch) => ipcRenderer.invoke('settings:set-ui-layout', patch)
   },
   update: {
     bootstrap: () => ipcRenderer.invoke('update:bootstrap'),

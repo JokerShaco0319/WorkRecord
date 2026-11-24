@@ -65,7 +65,7 @@ function QuadrantCard({
         setOver(false)
         onDropItem(quadrant.key)
       }}
-      className={`flex min-h-[240px] flex-col rounded-xl border p-3 transition-colors ${
+      className={`flex min-h-[200px] flex-col rounded-xl border p-3 transition-colors sm:min-h-[240px] ${
         over ? 'border-accent bg-accent-soft/50' : 'border-line bg-surface'
       }`}
     >
@@ -194,9 +194,9 @@ export default function TodoView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-10 pb-6 pt-10">
+      <div className="shrink-0 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8 lg:px-10 lg:pb-6 lg:pt-10">
         <div className="mx-auto w-full max-w-[980px]">
-          <div className="flex items-end justify-between gap-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
                 Todo
@@ -211,7 +211,7 @@ export default function TodoView() {
               type="button"
               data-action="todo-archive"
               onClick={() => setMode('archive')}
-              className="h-7 rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink"
+              className="h-7 self-start rounded-md border border-line bg-surface px-2.5 text-[11px] text-muted transition-colors hover:text-ink"
             >
               归档
             </button>
@@ -225,8 +225,8 @@ export default function TodoView() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
-        <div className="mx-auto grid w-full max-w-[980px] grid-cols-2 gap-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 sm:pb-12 lg:px-10 lg:pb-14">
+        <div className="mx-auto grid w-full max-w-[980px] grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
           {QUADRANTS.map((quadrant) => (
             <QuadrantCard
               key={quadrant.key}

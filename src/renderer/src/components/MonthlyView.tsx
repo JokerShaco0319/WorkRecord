@@ -51,9 +51,9 @@ export default function MonthlyView({ initialMonth }: { initialMonth?: string })
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-10 pb-5 pt-10">
+      <div className="shrink-0 px-4 pb-4 pt-6 sm:px-6 sm:pb-4 sm:pt-8 lg:px-10 lg:pb-5 lg:pt-10">
         <div className="mx-auto w-full max-w-[820px]">
-          <div className="flex items-start justify-between gap-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
                 Monthly
@@ -72,7 +72,7 @@ export default function MonthlyView({ initialMonth }: { initialMonth?: string })
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1 pt-1">
+            <div className="flex flex-wrap items-center gap-1 lg:shrink-0 lg:justify-end lg:pt-1">
               <button
                 type="button"
                 onClick={() => setMonth(addMonthsToMonthKey(month, -1))}
@@ -118,7 +118,7 @@ export default function MonthlyView({ initialMonth }: { initialMonth?: string })
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 sm:pb-12 lg:px-10 lg:pb-14">
         <div className="mx-auto w-full max-w-[820px]">
           <div className="rounded-xl border border-line bg-surface px-7 py-6">
             <MarkdownPreview raw={content} />

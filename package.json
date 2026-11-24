@@ -1,7 +1,7 @@
 {
   "name": "workrecord",
   "productName": "WorkRecord",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "本地 Markdown 工作记录与待办",
   "author": "WorkRecord",
   "main": "./out/main/index.js",

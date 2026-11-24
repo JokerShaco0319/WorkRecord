@@ -93,9 +93,9 @@ export default function StatsView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-10 pb-6 pt-10">
+      <div className="shrink-0 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8 lg:px-10 lg:pb-6 lg:pt-10">
         <div className="mx-auto w-full max-w-[980px]">
-          <div className="flex items-end justify-between gap-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
                 Stats
@@ -108,7 +108,7 @@ export default function StatsView() {
               </div>
             </div>
 
-            <div className="flex rounded-lg border border-line bg-paper p-0.5">
+            <div className="flex self-start rounded-lg border border-line bg-paper p-0.5">
               {PRESETS.map((item) => (
                 <button
                   key={item.key}
@@ -135,9 +135,9 @@ export default function StatsView() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-10 pb-14">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 sm:px-6 sm:pb-12 lg:px-10 lg:pb-14">
         <div className="mx-auto w-full max-w-[980px]">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="rounded-xl border border-line bg-surface px-4 py-4">
               <div className="text-[11px] text-muted">总耗时</div>
               <div className="mt-1 text-[22px] font-semibold tracking-tight tabular-nums">

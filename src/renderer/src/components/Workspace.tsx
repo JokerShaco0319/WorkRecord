@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SearchHit, VaultInfo } from '@shared/api'
+import { DEFAULT_UI_LAYOUT, UI_LAYOUT_LIMITS } from '@shared/layout'
 import {
   CalendarIcon,
   ChartIcon,
@@ -11,7 +12,9 @@ import {
   TimerIcon
 } from './icons'
 import DayView from './DayView'
+import { useUiLayout } from './LayoutProvider'
 import ProjectsView from './ProjectsView'
+import ResizeHandle from './ResizeHandle'
 import SearchOverlay from './SearchOverlay'
 import SettingsView from './SettingsView'
 import StatsView from './StatsView'
@@ -40,7 +43,7 @@ function NavItem({
   onClick
 }: NavItemProps) {
   const className = [
-    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors',
+    'flex w-full items-center justify-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors lg:justify-start',
     active ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0_/_0.05)]' : 'text-muted',
     disabled ? 'cursor-default opacity-40' : 'hover:bg-surface/60'
   ].join(' ')
@@ -48,20 +51,26 @@ function NavItem({
   const content = (
     <>
       <span className={active ? 'text-accent' : ''}>{icon}</span>
-      <span>{label}</span>
+      <span className="hidden lg:inline">{label}</span>
     </>
   )
 
   if (!onClick) {
     return (
-      <div aria-disabled={disabled || undefined} className={className}>
+      <div aria-disabled={disabled || undefined} className={className} title={label}>
         {content}
       </div>
     )
   }
 
   return (
-    <button type="button" data-action={dataAction} onClick={onClick} className={className}>
+    <button
+      type="button"
+      data-action={dataAction}
+      title={label}
+      onClick={onClick}
+      className={className}
+    >
       {content}
     </button>
   )
@@ -74,10 +83,15 @@ interface WorkspaceProps {
 }
 
 export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProps) {
+  const { layout, preview, commit } = useUiLayout()
   const [view, setView] = useState<View>('day')
   const [searchOpen, setSearchOpen] = useState(false)
   const [daySeed, setDaySeed] = useState<{ date: string; nonce: number } | null>(null)
   const [weekSeed, setWeekSeed] = useState<{ week: string; nonce: number } | null>(null)
+
+  const rootStyle = {
+    '--sidebar-width': `${layout.sidebarWidth}px`
+  } as CSSProperties
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -107,33 +121,37 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
   }
 
   return (
-    <div className="flex h-full">
-      <aside className="flex w-[212px] shrink-0 flex-col border-r border-line">
-        <div className="px-5 pb-4 pt-6">
-          <div className="flex items-center gap-2">
+    <div className="flex h-full" style={rootStyle}>
+      <aside className="flex w-16 shrink-0 flex-col border-r border-line lg:w-[var(--sidebar-width)] lg:border-r-0">
+        <div className="px-2 pb-4 pt-6 lg:px-5">
+          <div className="flex items-center justify-center gap-2 lg:justify-start">
             <span className="grid h-6 w-6 place-items-center rounded-md bg-ink text-[11px] font-semibold text-paper">
               W
             </span>
-            <span className="text-[13px] font-semibold tracking-tight">WorkRecord</span>
+            <span className="hidden text-[13px] font-semibold tracking-tight lg:inline">
+              WorkRecord
+            </span>
           </div>
         </div>
 
-        <div className="px-3 pb-2">
+        <div className="px-2 pb-2 lg:px-3">
           <button
             type="button"
             data-action="open-search"
             onClick={() => setSearchOpen(true)}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-muted transition-colors hover:bg-surface/60 hover:text-ink"
+            title="搜索 (Ctrl K)"
+            aria-label="搜索"
+            className="flex w-full items-center justify-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-muted transition-colors hover:bg-surface/60 hover:text-ink lg:justify-start"
           >
             <SearchIcon className="h-4 w-4" />
-            <span className="flex-1 text-left">搜索</span>
-            <span className="rounded border border-line px-1 py-px text-[10px] text-muted/60">
+            <span className="hidden flex-1 text-left lg:inline">搜索</span>
+            <span className="hidden rounded border border-line px-1 py-px text-[10px] text-muted/60 lg:inline">
               Ctrl K
             </span>
           </button>
         </div>
 
-        <nav className="space-y-0.5 px-3">
+        <nav className="space-y-0.5 px-2 lg:px-3">
           <NavItem
             icon={<CalendarIcon className="h-4 w-4" />}
             label="今日"
@@ -184,22 +202,24 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
           />
         </nav>
 
-        <div className="mt-auto border-t border-line/70 px-3 pb-4 pt-3">
+        <div className="mt-auto border-t border-line/70 px-2 pb-4 pt-3 lg:px-3">
           <button
             type="button"
             data-action="nav-settings"
+            title="设置"
+            aria-label="设置"
             onClick={() => setView('settings')}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+            className={`flex w-full items-center justify-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors lg:justify-start ${
               view === 'settings'
                 ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0_/_0.05)]'
                 : 'text-muted hover:bg-surface/60'
             }`}
           >
             <GearIcon className={`h-4 w-4 ${view === 'settings' ? 'text-accent' : ''}`} />
-            设置
+            <span className="hidden lg:inline">设置</span>
           </button>
 
-          <div className="mt-3 px-3">
+          <div className="mt-3 hidden px-3 lg:block">
             <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted/70">
               数据目录
             </div>
@@ -209,6 +229,17 @@ export default function Workspace({ vault, theme, onToggleTheme }: WorkspaceProp
           </div>
         </div>
       </aside>
+
+      <ResizeHandle
+        className="max-lg:hidden"
+        value={layout.sidebarWidth}
+        min={UI_LAYOUT_LIMITS.sidebarWidth.min}
+        max={UI_LAYOUT_LIMITS.sidebarWidth.max}
+        defaultValue={DEFAULT_UI_LAYOUT.sidebarWidth}
+        ariaLabel="调整导航栏宽度"
+        onPreview={(sidebarWidth) => preview({ sidebarWidth })}
+        onCommit={(sidebarWidth) => commit({ sidebarWidth })}
+      />
 
       <main className="min-w-0 flex-1 overflow-hidden">
         {view === 'day' && <DayView key={daySeed?.nonce ?? 'day'} initialDate={daySeed?.date} />}

@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { DEFAULT_UI_LAYOUT, sanitizeUiLayout, type UiLayout } from '@shared/layout'
 import type { UpdateSource } from '@shared/update'
 
 export type ThemeMode = 'light' | 'dark'
@@ -19,6 +20,7 @@ export interface AppConfig {
   lastSeenVersion: string | null
   skippedVersion: string | null
   lastUpdateCheck: string | null
+  uiLayout: UiLayout
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -33,7 +35,8 @@ const DEFAULT_CONFIG: AppConfig = {
   updateSource: 'auto',
   lastSeenVersion: null,
   skippedVersion: null,
-  lastUpdateCheck: null
+  lastUpdateCheck: null,
+  uiLayout: { ...DEFAULT_UI_LAYOUT }
 }
 const VAULT_FOLDERS = ['daily', 'weekly', 'projects', 'inbox', '.workrecord']
 
@@ -45,9 +48,13 @@ export async function readAppConfig(): Promise<AppConfig> {
   try {
     const raw = await readFile(appConfigPath(), 'utf-8')
     const parsed = JSON.parse(raw) as Partial<AppConfig>
-    return { ...DEFAULT_CONFIG, ...parsed }
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      uiLayout: sanitizeUiLayout(parsed.uiLayout, DEFAULT_UI_LAYOUT)
+    }
   } catch {
-    return { ...DEFAULT_CONFIG }
+    return { ...DEFAULT_CONFIG, uiLayout: { ...DEFAULT_UI_LAYOUT } }
   }
 }
 

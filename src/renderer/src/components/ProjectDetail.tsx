@@ -290,7 +290,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-line/60 px-10 pt-8 pb-3">
+      <div className="shrink-0 border-b border-line/60 px-4 pb-3 pt-5 sm:px-6 sm:pt-7 lg:px-10 lg:pt-8">
         <div className="mx-auto w-full max-w-[1120px]">
           <button
             type="button"
@@ -302,7 +302,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
             全部项目
           </button>
 
-          <div className="mt-2 flex items-start justify-between gap-4">
+          <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="truncate text-[22px] font-semibold tracking-tight">
@@ -323,7 +323,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex rounded-lg border border-line bg-paper p-0.5">
                 {(
                   [
@@ -446,7 +446,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
           if (!next || !event.currentTarget.contains(next)) setDragOver(false)
         }}
         onDrop={(event) => void handleDrop(event)}
-        className="relative min-h-0 flex-1 px-10 py-5"
+        className="relative min-h-0 flex-1 px-4 py-4 sm:px-6 lg:px-10 lg:py-5"
       >
         <div className="mx-auto flex h-full w-full max-w-[1120px] gap-4">
           <div className="min-w-0 flex-1 overflow-y-auto pb-4">
@@ -762,10 +762,10 @@ export default function ProjectDetail({ name, onBack }: Props) {
                             </span>
                           )}
 
-                          <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
+                          <span className="hidden w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70 lg:block">
                             {formatSize(file.size)}
                           </span>
-                          <span className="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70">
+                          <span className="hidden w-12 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted/70 lg:block">
                             {formatModified(file.modified)}
                           </span>
 
@@ -871,7 +871,7 @@ export default function ProjectDetail({ name, onBack }: Props) {
           </div>
 
           {mode === 'files' && category && (
-            <aside className="hidden w-[240px] shrink-0 overflow-y-auto rounded-xl border border-line bg-surface px-3 py-3 lg:block">
+            <aside className="hidden w-[240px] shrink-0 overflow-auto rounded-xl border border-line bg-surface px-3 py-3 xl:block">
               <FileTree
                 folders={categoryFolders}
                 files={categoryFiles}

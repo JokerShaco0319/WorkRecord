@@ -164,6 +164,31 @@ body {
   text-underline-offset: 2px;
 }
 
+.md-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.md-preview table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.md-preview th,
+.md-preview td {
+  padding: 4px 8px;
+  border: 1px solid var(--color-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.md-preview th {
+  background-color: var(--color-code-bg);
+  font-weight: 600;
+}
+
 .md-preview input[type='checkbox'] {
   margin-right: 4px;
 }

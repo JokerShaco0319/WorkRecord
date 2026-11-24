@@ -14,6 +14,7 @@ import type {
   WeeklyPreview
 } from '@shared/api'
 import { formatDateKey, formatTimeHm, monthKeyForDate } from '@shared/date'
+import { sanitizeUiLayout, type UiLayout } from '@shared/layout'
 import type { ProjectStatus } from '@shared/md/project'
 import type { DayDoc, EntryInput, EntryTarget } from '@shared/md/month'
 import type { UpdateSource } from '@shared/update'
@@ -132,7 +133,8 @@ function currentSettings(config: AppConfig): AppSettings {
     backupReminderEnabled: config.backupReminderEnabled,
     backupReminderTime: config.backupReminderTime,
     updateCheckEnabled: config.updateCheckEnabled,
-    updateSource: config.updateSource
+    updateSource: config.updateSource,
+    uiLayout: config.uiLayout
   }
 }
 
@@ -775,6 +777,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       return currentSettings(
         await updateAppConfig({ updateCheckEnabled: Boolean(enabled), updateSource: source })
       )
+    }
+  )
+
+  ipcMain.handle(
+    'settings:set-ui-layout',
+    async (_event, patch: Partial<UiLayout> | null): Promise<AppSettings> => {
+      const config = await readAppConfig()
+      const uiLayout = sanitizeUiLayout(patch, config.uiLayout)
+      return currentSettings(await updateAppConfig({ uiLayout }))
     }
   )
 

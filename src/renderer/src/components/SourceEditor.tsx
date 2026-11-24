@@ -3,7 +3,10 @@ import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { basicSetup } from 'codemirror'
 import { markdown } from '@codemirror/lang-markdown'
+import { DEFAULT_UI_LAYOUT, UI_LAYOUT_LIMITS } from '@shared/layout'
+import { useUiLayout } from './LayoutProvider'
 import MarkdownPreview from './MarkdownPreview'
+import ResizeHandle from './ResizeHandle'
 
 const editorTheme = EditorView.theme({
   '&': {
@@ -64,6 +67,8 @@ export default function SourceEditor({
   onSaved,
   onError
 }: Props) {
+  const { layout, preview, commit } = useUiLayout()
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const savingRef = useRef(false)
@@ -134,6 +139,16 @@ export default function SourceEditor({
     }
   }, [])
 
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    const observer = new ResizeObserver(() => {
+      viewRef.current?.requestMeasure()
+    })
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [])
+
   const persist = useCallback(async () => {
     if (savingRef.current) return
     savingRef.current = true
@@ -166,11 +181,14 @@ export default function SourceEditor({
   const dirty = raw !== saved
 
   return (
-    <div className="flex h-full min-h-0">
-      <div className="flex min-w-0 flex-1 flex-col border-r border-line">
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-line/70 px-4">
-          <span className="truncate font-mono text-[11px] text-muted">{label}</span>
-          <div className="flex items-center gap-3">
+    <div ref={containerRef} className="flex h-full min-h-0">
+      <div
+        className="flex min-w-0 flex-col"
+        style={{ flexGrow: layout.sourceSplit, flexBasis: 0 }}
+      >
+        <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line/70 px-4">
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">{label}</span>
+          <div className="flex shrink-0 items-center gap-3">
             <span className={`text-[11px] ${dirty ? 'text-amber-600' : 'text-muted/60'}`}>
               {dirty ? '有未保存的修改' : '已保存'}
             </span>
@@ -196,8 +214,29 @@ export default function SourceEditor({
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-y-auto bg-surface px-7 py-6">
-        <MarkdownPreview raw={raw} />
+      <ResizeHandle
+        unit="percent"
+        value={layout.sourceSplit}
+        min={UI_LAYOUT_LIMITS.sourceSplit.min}
+        max={UI_LAYOUT_LIMITS.sourceSplit.max}
+        defaultValue={DEFAULT_UI_LAYOUT.sourceSplit}
+        step={2}
+        containerRef={containerRef}
+        ariaLabel="调整编辑与预览比例"
+        onPreview={(sourceSplit) => preview({ sourceSplit })}
+        onCommit={(sourceSplit) => {
+          commit({ sourceSplit })
+          viewRef.current?.requestMeasure()
+        }}
+      />
+
+      <div
+        className="min-w-0 overflow-y-auto bg-surface"
+        style={{ flexGrow: 100 - layout.sourceSplit, flexBasis: 0 }}
+      >
+        <div className="px-4 py-4 lg:px-7 lg:py-6">
+          <MarkdownPreview raw={raw} />
+        </div>
       </div>
     </div>
   )

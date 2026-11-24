@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { VaultInfo } from '@shared/api'
+import LayoutProvider from './components/LayoutProvider'
 import UpdateProvider from './components/UpdateProvider'
 import Welcome from './components/Welcome'
 import Workspace from './components/Workspace'
@@ -50,7 +51,9 @@ export default function App() {
       {!vault ? (
         <div className="grid h-full place-items-center text-sm text-muted">正在加载…</div>
       ) : vault.path ? (
-        <Workspace vault={vault} theme={theme} onToggleTheme={() => void toggleTheme()} />
+        <LayoutProvider>
+          <Workspace vault={vault} theme={theme} onToggleTheme={() => void toggleTheme()} />
+        </LayoutProvider>
       ) : (
         <Welcome onReady={setVault} />
       )}
