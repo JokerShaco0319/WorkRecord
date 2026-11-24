@@ -1,11 +1,11 @@
 {
-  "version": "0.3.4",
-  "date": "2026-11-19",
-  "notes": "### 修复\n- 安装程序在开始安装前自动关闭托盘中的 WorkRecord，不再出现「正在运行」的阻断提示",
-  "sha256": "b64bde2228e238e900ddced07daa29bda1694ce9e8290208efc07daa233fdcba",
+  "version": "0.3.6",
+  "date": "2026-11-24",
+  "notes": "### 新增\n- 全局搜索支持项目文件：文件名覆盖所有类型，文本文件可搜索正文并显示命中片段\n- 项目文件索引在后台自动维护，文件变化后增量刷新；二进制文档暂只按文件名搜索\n\n### 修复\n- 搜索结果中的项目文件可以正确打开嵌套目录下的文件",
+  "sha256": "cdb92ffa6b67ebacc121885cce307dce0f110cd1a8a7554d68894592d6d6f307",
   "downloads": {
-    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.4/WorkRecord-Setup-0.3.4.exe",
-    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.4/WorkRecord-Setup-0.3.4.exe",
-    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.4/WorkRecord-Setup-0.3.4.exe"
+    "github": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.6/WorkRecord-Setup-0.3.6.exe",
+    "gitcode": "https://gitcode.com/jokershaco/WorkRecord/releases/download/v0.3.6/WorkRecord-Setup-0.3.6.exe",
+    "default": "https://github.com/JokerShaco0319/WorkRecord/releases/download/v0.3.6/WorkRecord-Setup-0.3.6.exe"
   }
 }
